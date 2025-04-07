@@ -109,7 +109,8 @@ set (MINOTAUR_SOURCES
      #base/QGAdvHandler.cpp 
      base/QGHandler.cpp 
      #base/QGHandlerAdvance.cpp 
-     #base/QGHandlerPDE.cpp 
+     #base/QGHandlerPDE.cpp
+     base/QLBrancher.cpp 
      base/QuadHandler.cpp 
      base/kPowHandler.cpp 
      base/QuadraticFunction.cpp
@@ -250,6 +251,7 @@ set (MINOTAUR_HEADERS
      base/Problem.h
      base/ProblemSize.h
      base/ProbStructure.h # Serdar
+     base/QLBrancher.h
      base/QPEngine.h
      base/QGHandler.h
      base/QGHandlerAdvance.h 
@@ -465,7 +467,6 @@ if (IFACE_SOURCES)
     solvers/Bnb.cpp 
     solvers/Glob.cpp 
     solvers/MultiStart.cpp 
-    solvers/SolCheck.cpp 
     solvers/QG.cpp 
     solvers/QGPar.cpp 
     solvers/BnbPar.cpp 
@@ -475,7 +476,6 @@ if (IFACE_SOURCES)
     solvers/Bnb.h 
     solvers/Glob.h 
     solvers/MultiStart.h 
-    solvers/SolCheck.h 
     solvers/QG.h 
     solvers/QGPar.h 
     solvers/BnbPar.h 
@@ -533,11 +533,6 @@ if (IFACE_SOURCES)
   target_link_libraries(mmultistart ${ALL_EXEC_LIBS})
   install(TARGETS mmultistart RUNTIME DESTINATION bin)
   set_target_properties(mmultistart PROPERTIES INSTALL_RPATH "${MNTR_INSTALL_RPATH}")
-  
-  add_executable(mcheck solvers/SolCheckMain.cpp)
-  target_link_libraries(mcheck ${ALL_EXEC_LIBS})
-  install(TARGETS mcheck RUNTIME DESTINATION bin)
-  set_target_properties(mcheck PROPERTIES INSTALL_RPATH "${MNTR_INSTALL_RPATH}")
   
 endif()
 
