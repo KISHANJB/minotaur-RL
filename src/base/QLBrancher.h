@@ -7,22 +7,25 @@
 /**
  * \file QLBrancher.h
  * \brief Declare methods and data structures for reliability branching.
- * \author Ashutosh Mahajan, Argonne National Laboratory
+ * \author KISHAN, IEOR IIT Delhi
  */
 
 
-#ifndef MINOTAURRELIABILITYBRANCHER_H
-#define MINOTAURRELIABILITYBRANCHER_H
+#ifndef MINOTAURQLBRANCHER_H
+#define MINOTAURQLBRANCHER_H
 
-#include "Brancher.h"
-
+#include "Brancher.h" 
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include "BrCand.h"
 namespace Minotaur {
 
 class Engine;
 class Timer;
 typedef Engine* EnginePtr;
 
-struct RelBrStats {
+struct QLBrStats {
   UInt bndChange;  /// Number of times variable bounds were changed.
   UInt calls;      /// Number of times called to find a branching candidate.
   UInt engProbs;   /// Number of times an unexpected engine status was met.
@@ -31,6 +34,24 @@ struct RelBrStats {
   double strTime;  /// Total time spent in strong-branching.
 };
 
+
+
+// Custom hash for vector<double>
+struct VectorHash {
+    size_t operator()(const std::vector<double>& v) const {
+        std::hash<double> hasher;
+        size_t seed = 0;
+        for (double d : v) seed ^= hasher(d) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        return seed;
+    }
+};
+
+// Q-table type definition
+using QTable = std::unordered_map<
+    std::vector<double>,          // State
+    std::unordered_map<BrCandPtr, double>, // Action->Q-value
+    VectorHash
+>;
 
 /// A class to select a variable for branching using reliability branching.
 class QLBrancher : public Brancher {
@@ -52,6 +73,33 @@ public:
   Branches findBranches(RelaxationPtr rel, NodePtr node, 
                         ConstSolutionPtr sol, SolutionPoolPtr s_pool, 
                         BrancherStatus & br_status, ModVector &mods);
+
+/// Name.
+  const static std::string me_;
+
+  /*std::vector<double> current_state;                                                          
+  std::vector<double> prev_state;                                                             
+  Minotaur::BrCandPtr  prev_best_cand,best_cand,action;// Using prev_best_cand to store the action taken for the previous state or at the parent node. 
+  QTable Q1;
+*/
+
+//using QTable = std::unordered_map< >;
+
+ //QTable Q1;
+   
+// Q-Table  insert function
+  void insert_qvalue(QTable& qtable, std::vector<double>& s, BrCandPtr a, double q_value);
+
+// Q-Table  access function
+  double get_qvalue(QTable& qtable, std::vector<double>& s, BrCandPtr a);
+
+// Print Q-Table
+  void printQTable();  
+
+  // Return the QTable data structure
+  //QTable getQTable(){ return Q1; };
+
+  QTable getQTable();
 
   /// Return value of trustCutoff parameter.
   bool getTrustCutoff();
@@ -130,9 +178,18 @@ private:
    * bound).
    * \param[in] node The node at which we are branching.
    */
+
+ // std::map<NodePtr, std::vector<double>> Q1;
   BrCandPtr findBestCandidate_(const double objval, double cutoff, 
                                NodePtr node);
-
+   QTable qtable_;     
+//  TreeManagerPtr tm_;
+ // Minotaur::NodeRelaxerPtr nodeRlxr_;
+  Minotaur::EnvPtr env_;
+ // Minotaur::ProblemHandlerPtr handler_;
+  Minotaur::EnginePtr engine_; 
+  Minotaur::SolutionPoolPtr solPool_;
+ // Minotaur::BrancherStats *stats_;
   /**
    * \brief Find and sort candidates for branching.
    *
@@ -143,7 +200,7 @@ private:
    * branching.  
    */
   void findCandidates_();
-
+  BrVarCandSet  findCandidates();
   /**
    * Clean up reliable and unreliable candidates, except for the no_del
    * candidate.
@@ -160,34 +217,11 @@ private:
    */
 
 
-  // --- Collection of  Actions (Branching Decisions) ---
-
-
-vector<double> QLBrancher::getActions(RelaxationPtr rel,const DoubleVector &x,
-                                           ModVector &)
-
-
-// --- Epsilon-Greedy Action Selection ---
-int getEpsilonGreedyAction(const std::vector<double>& actions, const std::vector<double>& Q_values, double epsilon)
-
-
-
-// --- Count All Descendants Using External Map ---
-int countDescendantNodesExternal(NodePtr node, const std::map<NodePtr, std::vector<NodePtr>>& childMap)
-
-
-// --- Q-Learning Loop ---SIMPLE SIMPLE SIMPLE(Only Descendant Reward))
-void qLearning1()
-
-
-//-------- Q-Learning with Dynamic Rewards----------------
-void qLearning1()
-
 // Print the Q-table
-void printQTable1()
+//void printQTable1();
 
 
-  void getPCScore_(BrCandPtr cand, double *ch_down, double *ch_up, 
+void getPCScore_(BrCandPtr cand, double *ch_down, double *ch_up, 
                    double *score);
 
   /**
@@ -279,7 +313,7 @@ void printQTable1()
   void writeScores_(std::ostream &out);
 
   /// The engine used for strong branching.
-  EnginePtr engine_;
+  //EnginePtr engine_;
 
   /// Tolerance for avoiding division by zero.
   const double eTol_;
@@ -309,10 +343,7 @@ void printQTable1()
   /**
    * \brief Do not strong-branch on more than these many candidates
    */
-  UInt maxStrongCands_;
-
-  /// Name.
-  const static std::string me_; 
+  UInt maxStrongCands_; 
 
   /**
    * \brief Don't do strong branching on a cand if we did it 'k' nodes
@@ -336,7 +367,7 @@ void printQTable1()
   std::vector<BrCandPtr> relCands_;
 
   /// Statistics.
-  RelBrStats * stats_;
+  QLBrStats * stats_;
 
   /// Status of problem after using this brancher.
   BrancherStatus status_;
@@ -370,9 +401,15 @@ void printQTable1()
 
   /// The values of variables in the solution of the current relaxation.
   DoubleVector x_;
+  //QTable Q1;
+  std::vector<double> current_state={};
+  std::vector<double> prev_state={};
+  //Minotaur::BrCandPtr  prev_best_cand,best_cand,action;// Using prev_best_cand to store the action taken for the previous state or at the parent node.
 
-};
-typedef QLBrancher* QLBrancherPtr;
+
+
+};  
+typedef QLBrancher*  QLBrancherPtr;
 }
 #endif
 

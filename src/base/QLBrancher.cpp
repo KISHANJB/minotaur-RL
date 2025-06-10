@@ -12,7 +12,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iomanip>
 #include <omp.h>
 #include <random>
 #include "BrCand.h"
@@ -33,24 +32,45 @@
 #include "SolutionPool.h"
 #include "Timer.h"
 #include "Variable.h"
-#include "BranchAndBound.h"
-
+#include "BranchAndBound.h" 
+#include "NodeRelaxer.h"
+#include <vector>
+#include <unordered_map>       // For std::map
+#include <iterator>  // Optional, for std::begin and std::end
+#include <iostream>
+#include <functional>
+#include <string>
+#include <limits> 
+#include <iomanip>  // for std::setprecision
 //#define SPEW 1
+
+
+using namespace Minotaur;
+const std::string QLBrancher::me_ = "QL brancher: ";
 
 // --- Q-Learning Parameters ---
 const int EPISODES = 100;
 const double ALPHA = 0.1;     // Learning rate
 const double GAMMA = 0.95;    // Discount factor
-const double EPSILON = 0.2;   // Exploration rate
+const double EPSILON = 0.5;   // Exploration rate
+static constexpr double DEFAULT_Q = 0.0; // <-- Default value here
+//std::vector<double> state;
+//std::vector<double> current_state;
+//std::vector<double> prev_state;
+Minotaur::BrCandPtr  prev_best_cand,best_cand,action;// Using prev_best_cand to store the action taken for the previous state or at the parent node. 
 
-std::map<NodePtr, std::vector<double>> Q1;  // Q-Table
+//QTable QLBrancher::Q1;
 
-using namespace Minotaur;
-
-const std::string QLBrancher::me_ = "QL brancher: ";
+//Q-Table  insert function
+/**** void insert_qvalue(QTable& qtable, std::vector<double>& s, BrCandPtr a, double q_value)
+ {
+	 qtable[s][a] = q_value;
+ };
+***/
 
 QLBrancher::QLBrancher(EnvPtr env, HandlerVector& handlers)
-  : engine_(EnginePtr()), // NULL
+  : qtable_(),
+    engine_(EnginePtr()), // NULL
     eTol_(1e-6),
     handlers_(handlers), // Create a copy, the vector is not too big
     init_(false),
@@ -63,10 +83,16 @@ QLBrancher::QLBrancher(EnvPtr env, HandlerVector& handlers)
     thresh_(4),
     trustCutoff_(true),
     x_(0)
-{
+   // current_state = std::vector<double>{};
+   // prev_state = std::vector<double>{};
+   // prev_best_cand=0;
+   // best_cand=0;
+   // action=0;
+    
+{ 
   timer_ = env->getNewTimer();
   logger_ = env->getLogger();
-  stats_ = new RelBrStats();
+  stats_ = new QLBrStats();
   stats_->calls = 0;
   stats_->engProbs = 0;
   stats_->strBrCalls = 0;
@@ -75,11 +101,55 @@ QLBrancher::QLBrancher(EnvPtr env, HandlerVector& handlers)
   stats_->strTime = 0.0;
 }
 
+
+
 QLBrancher::~QLBrancher()
 {
   delete stats_;
   delete timer_;
 }
+
+// Q-Table  access function
+/*double get_qvalue(QTable& qtable, std::vector<double>& s, BrCandPtr a) {
+  //       static constexpr double DEFAULT_Q = 0.0; // <-- Default value here
+         auto s_entry = qtable.find(s);
+         if (s_entry == qtable.end()) return DEFAULT_Q;
+         auto a_entry = s_entry->second.find(a);
+         return (a_entry != s_entry->second.end()) ? a_entry->second : DEFAULT_Q;
+};*/
+
+//QTable getQTable(){
+//	return qtable_;
+// }
+
+
+
+
+
+// Print the Q-table
+void printQTable() {
+    std::cout << "======= Q-Table =======" << std::endl;
+
+    for (const auto& [state, actionMap] : qtable_) {
+        std::cout << "State: [ ";
+        for (double s : state) {
+            std::cout << std::fixed << std::setprecision(2) << s << " ";
+        }
+        std::cout << "]\n";
+
+        for (const auto& [action, q_value] : actionMap) {
+            std::cout << "  Action: " << action->getName()
+                      << " => Q-Value: " << std::fixed << std::setprecision(4) << q_value
+                      << std::endl;
+        }
+        std::cout << "------------------------" << std::endl;
+    }
+
+    std::cout << "======= End of Q-Table =======" << std::endl;
+}
+
+
+
 
 BrCandPtr QLBrancher::findBestCandidate_(const double objval,
                                                   double cutoff, NodePtr node)
@@ -88,49 +158,102 @@ BrCandPtr QLBrancher::findBestCandidate_(const double objval,
   double score, change_up, change_down, maxchange;
   UInt cnt, maxcnt;
   EngineStatus status_up, status_down;
-  BrCandPtr cand, best_cand = 0;
+  BrCandPtr cand;
+  std::vector<double> upperBounds;
+  static std::vector<double> current_state={};
+  static BrCandPtr best_cand = 0;
+  prev_state=current_state;
+  prev_best_cand = best_cand;
+  decltype(relCands_) var = relCands_;
+  var.insert(var.end(),unrelCands_.begin(), unrelCands_.end());  // Automatically avoids duplicates
 
-  // first evaluate candidates that have reliable pseudo costs
-  for(BrCandVIter it = relCands_.begin(); it != relCands_.end(); ++it) {
-    getPCScore_(*it, &change_down, &change_up, &score);
-    if(score > best_score) {
-      best_score = score;
-      best_cand = *it;
-      if(change_up > change_down) {
-        best_cand->setDir(DownBranch);
-      } else {
-        best_cand->setDir(UpBranch);
-      }
-    }
+
+  for(BrCandVIter it = var.begin(); it != var.end(); ++it) {
+                BrVarCand* varCand = dynamic_cast<BrVarCand*>(*it);
+                double  lb = varCand->getVar()->getLb();
+                double  ub = varCand->getVar()->getUb();
+                current_state.push_back(lb);          // Collect LB
+                upperBounds.push_back(ub);          // Collect UB
   }
+  current_state.insert(current_state.end(), upperBounds.begin(), upperBounds.end());//Finally getting the current state vector----
 
-  maxchange = cutoff - objval;
-  // now do strong branching on unreliable candidates
-  if(unrelCands_.size() > 0) {
-    BrCandVIter it;
-    engine_->enableStrBrSetup();
-    engine_->setIterationLimit(maxIterations_); // TODO: make limit dynamic.
-    cnt = 0;
-    maxcnt = (node->getDepth() > maxDepth_) ? 0 : maxStrongCands_;
-    for(it = unrelCands_.begin(); it != unrelCands_.end() && cnt < maxcnt;
-        ++it, ++cnt) {
-      cand = *it;
-      strongBranch_(cand, change_up, change_down, status_up, status_down);
-      change_up = std::max(change_up - objval, 0.0);
-      change_down = std::max(change_down - objval, 0.0);
-      useStrongBranchInfo_(cand, maxchange, change_up, change_down, status_up,
-                           status_down);
-      score = getScore_(change_up, change_down);
-      lastStrBranched_[cand->getPCostIndex()] = stats_->calls;
-#if SPEW
-      writeScore_(cand, score, change_up, change_down);
-#endif
-      if(status_ != NotModifiedByBrancher) {
-        break;
-      }
+
+
+
+/** -------------------------------------------------------------- RL Framework starts here-------------------------------------------------------------------------------------------*/
+
+
+  if((node->getDepth())>0) {
+         double current_lb,prev_lb,delta_lb;
+    //---- Fetching lower bounds on the optimal solution for calculating reward----
+         current_lb= node->getLb();
+         prev_lb=node->getParent()->getLb();
+         delta_lb= current_lb-prev_lb;
+   
+   //---- Q-value updates--------
+         double maxNextQ = 0.0;  // Since nextState is always unseen, assume max Q-value is 0
+         double qsa = 0;
+        // if (!prev_state.empty() && prev_best_cand) {
+         	auto s_entry = qtable_.find(prev_state);
+         	qsa = DEFAULT_Q;
+         	if (s_entry != qtable_.end()) {
+         		auto a_entry = s_entry->second.find(prev_best_cand);
+         		qsa = (a_entry != s_entry->second.end()) ? a_entry->second : DEFAULT_Q;
+         	}
+         	qsa += ALPHA * (delta_lb + GAMMA * maxNextQ - qsa);
+         	qtable_[prev_state][prev_best_cand] = qsa;
+        // }
+
+
+   // -------Epsilon-greedy action selection----
+         if (var.empty()){
+         	std::cout<<"No Actions Possible";
+         	//return nullptr;
+         }
+	 std::random_device rd;
+         std::mt19937 gen(rd());
+         std::uniform_real_distribution<double> prob_dist(0.0, 1.0);
+
+         if (prob_dist(gen) < EPSILON) {
+    // Exploration: pick a random action
+                std::uniform_int_distribution<size_t> action_dist(0, var.size() - 1);
+                best_cand = var[action_dist(gen)];
+		//return best_cand;
+	 } else {
+    // Exploitation: pick the best action (with random tie-breaking)
+                double max_q = -std::numeric_limits<double>::infinity();
+                std::vector<decltype(var)::value_type> best_actions;
+
+                for (const auto& action : var) {
+			double q = DEFAULT_Q;
+                        auto st_entry = qtable_.find(current_state);
+                        if (st_entry != qtable_.end()) {
+				auto ac_entry = st_entry->second.find(action);
+                                if (ac_entry != st_entry->second.end()) {
+					q = ac_entry->second;
+				}
+			}
+			if (q > max_q) {
+				max_q = q;
+                                best_actions = {action}; 
+			}
+			else if (q == max_q) {
+				best_actions.push_back(action); 
+			}
+		}
+		// Break ties randomly among best actions
+		std::uniform_int_distribution<size_t> tie_dist(0, best_actions.size() - 1);
+		best_cand = best_actions[tie_dist(gen)];
+		
+	 }
+	 return best_cand;
+
+  } else {
+    // first evaluate candidates that have reliable pseudo costs
+    for(BrCandVIter it = relCands_.begin(); it != relCands_.end(); ++it) { 
+      getPCScore_(*it, &change_down, &change_up, &score);
       if(score > best_score) {
         best_score = score;
-        best_cand = cand;
         if(change_up > change_down) {
           best_cand->setDir(DownBranch);
         } else {
@@ -138,34 +261,71 @@ BrCandPtr QLBrancher::findBestCandidate_(const double objval,
         }
       }
     }
-    engine_->resetIterationLimit();
-    engine_->disableStrBrSetup();
-    if(NotModifiedByBrancher == status_) {
-      // get score of remaining unreliable candidates as well.
-      for(; it != unrelCands_.end(); ++it) {
-        getPCScore_(*it, &change_down, &change_up, &score);
-        if(score > best_score) {
-          best_score = score;
-          best_cand = *it;
-          if(change_up > change_down) {
-            best_cand->setDir(DownBranch);
-          } else {
-            best_cand->setDir(UpBranch);
+    maxchange = cutoff - objval;
+    // now do strong branching on unreliable candidates
+    if(unrelCands_.size() > 0) {
+            BrCandVIter it;
+            engine_->enableStrBrSetup();
+            engine_->setIterationLimit(maxIterations_); // TODO: make limit dynamic.
+            cnt = 0;
+            maxcnt = (node->getDepth() > maxDepth_) ? 0 : maxStrongCands_;
+            for(it = unrelCands_.begin(); it != unrelCands_.end() && cnt < maxcnt;++it, ++cnt) {
+          	  cand = *it;
+          	  strongBranch_(cand, change_up, change_down, status_up, status_down);
+          	  change_up = std::max(change_up - objval, 0.0);
+          	  change_down = std::max(change_down - objval, 0.0);
+          	  useStrongBranchInfo_(cand, maxchange, change_up, change_down, status_up,status_down);
+          	  score = getScore_(change_up, change_down);
+                    lastStrBranched_[cand->getPCostIndex()] = stats_->calls;
+                    #if SPEW
+                    writeScore_(cand, score, change_up, change_down);
+                    #endif
+                    if(status_ != NotModifiedByBrancher) {
+                              break;
+                    }
+                    if(score > best_score) {
+          		  best_score = score;
+          		  best_cand = cand;
+          		   if(change_up > change_down) {
+          			   best_cand->setDir(DownBranch);
+          		   } else {
+          			   best_cand->setDir(UpBranch);
+          		   }
+          	  }
+            }
+     engine_->resetIterationLimit();
+     engine_->disableStrBrSetup();
+      if(NotModifiedByBrancher == status_) {
+        // get score of remaining unreliable candidates as well.
+        for(; it != unrelCands_.end(); ++it) {
+          getPCScore_(*it, &change_down, &change_up, &score);
+          if(score > best_score) {
+            best_score = score;
+            best_cand = *it;
+            if(change_up > change_down) {
+              best_cand->setDir(DownBranch);
+            } else {
+              best_cand->setDir(UpBranch);
+            }
           }
         }
       }
     }
+    //if (best_cand) {
+      //#pragma omp critical
+      //std::cout << "in rel: node " << node->getId() << " lb " << node->getLb()
+      //<< " brCand " << best_cand->getName() << " best score " << best_score
+      //<< " thread  " << omp_get_thread_num() << "\n";
+    //} else {
+      //std::cout << "in ql: no bestcand at node " << node->getId() << "\n";
+    //}
+   // std::cout <<"Reliable best_cand" << best_cand->getName() << "\n";
+    return best_cand;
   }
-  //if (best_cand) {
-  //#pragma omp critical
-  //std::cout << "in rel: node " << node->getId() << " lb " << node->getLb()
-  //<< " brCand " << best_cand->getName() << " best score " << best_score
-  //<< " thread  " << omp_get_thread_num() << "\n";
-  //} else {
-  //std::cout << "in rel: no bestcand at node " << node->getId() << "\n";
-  //}
-  return best_cand;
 }
+
+
+
 
 Branches QLBrancher::findBranches(RelaxationPtr rel, NodePtr node,
                                            ConstSolutionPtr sol,
@@ -176,7 +336,24 @@ Branches QLBrancher::findBranches(RelaxationPtr rel, NodePtr node,
   Branches branches = 0;
   BrCandPtr br_can = 0;
   const double* x = sol->getPrimal();
-
+  UInt depth = node->getDepth(); 
+  if (depth % 20 == 2) {
+	  std::cout << "======= Q-Table(depth = "<< depth << ") =======" << std::endl;
+	  for (const auto& [state, actionMap] : qtable_) {
+		  std::cout << "State: [ ";
+		  for (double s : state) {
+			  std::cout << std::fixed << std::setprecision(2) << s << " ";
+		  }
+		  std::cout << "]\n";
+		  for (const auto& [action, q_value] : actionMap) { 
+			  std::cout << "  Action: " << action->getName()                 //name
+				  << " => Q-Value: " << std::fixed << std::setprecision(4) << q_value
+				  << std::endl;
+		  }
+		  std::cout << "------------------------" << std::endl;
+	  }
+	  std::cout << "======= End of Q-Table =======" << std::endl;
+  }
   ++(stats_->calls);
   if(!init_) {
     init_ = true;
@@ -186,7 +363,7 @@ Branches QLBrancher::findBranches(RelaxationPtr rel, NodePtr node,
   br_status = NotModifiedByBrancher;
   status_ = NotModifiedByBrancher;
   mods_.clear();
-
+  
   // make a copy of x, because it is overwritten while strong branching.
   x_.resize(rel->getNumVars());
   std::copy(x, x + rel->getNumVars(), x_.begin());
@@ -196,15 +373,15 @@ Branches QLBrancher::findBranches(RelaxationPtr rel, NodePtr node,
     br_status = status_;
     return 0;
   }
-
   if(status_ == NotModifiedByBrancher) {
-    br_can = findBestCandidate_(sol->getObjValue(),
+		  br_can = findBestCandidate_(sol->getObjValue(),
                                 s_pool->getBestSolutionValue(), node);
   }
 
   // status_ might have changed now. Check again.
   if(status_ == NotModifiedByBrancher) {
     // surrounded by br_can :-)
+   //if (br_can && br_can->getHandler()){
     branches = br_can->getHandler()->getBranches(br_can, x_, rel_, s_pool);
     for(BranchConstIterator br_iter = branches->begin();
         br_iter != branches->end(); ++br_iter) {
@@ -214,6 +391,7 @@ Branches QLBrancher::findBranches(RelaxationPtr rel, NodePtr node,
     logger_->msgStream(LogDebug)
         << me_ << "best candidate = " << br_can->getName() << std::endl;
 #endif
+   // }
   } else {
     // we found some modifications that can be done to the node. Send these
     // back to the processor.
@@ -243,6 +421,9 @@ Branches QLBrancher::findBranches(RelaxationPtr rel, NodePtr node,
   }
   return branches;
 }
+
+
+
 
 void QLBrancher::findCandidates_()
 {
@@ -285,7 +466,8 @@ void QLBrancher::findCandidates_()
       if(is_inf) {
         status_ = PrunedByBrancher;
       } else {
-        status_ = ModifiedByBrancher;
+ 
+       	      status_ = ModifiedByBrancher;
       }
       return;
     }
@@ -343,218 +525,6 @@ void QLBrancher::freeCandidates_(BrCandPtr no_del)
   relCands_.clear();
   unrelCands_.clear();
 }
-
-// --- Collection of  Actions (Branching Decisions) ---
-
-
-vector<double> QLBrancher::getActions(RelaxationPtr rel,const DoubleVector &x,
-                                           ModVector &)
-{
-
-  std::vector<double> actions;	
-  VariablePtr v;
-  VariableType v_type;
-  UInt index;
-
-  for (VariableConstIterator it=rel->varsBegin(); it!=rel->varsEnd(); ++it) {
-    v = *it;
-    v_type = v->getType();
-    index = v->getIndex();
-    if ((v_type==Binary || v_type==Integer)) {
-      // Store the actions as indices.
-      double v_index = index;
-      actions.push_back(v_index);
-    }
-  }
-
-return actions;
-}
-
-
-
-
-// --- Epsilon-Greedy Action Selection ---
-int getEpsilonGreedyAction(const std::vector<double>& actions, const std::vector<double>& Q_values, double epsilon) {
-    if (actions.empty()) return -1;
-
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<double> prob_dist(0.0, 1.0);
-    double rand_prob = prob_dist(gen);
-
-    if (rand_prob < epsilon) {
-        std::uniform_int_distribution<size_t> dist(0, actions.size() - 1);
-        return static_cast<int>(actions[dist(gen)]);
-    } else {
-        size_t best_index = std::distance(Q_values.begin(), std::max_element(Q_values.begin(), Q_values.end()));
-        return static_cast<int>(actions[best_index]);
-    }
-}
-
-// --- Count All Descendants Using External Map ---
-int countDescendantNodesExternal(NodePtr node, const std::map<NodePtr, std::vector<NodePtr>>& childMap) {
-    if (!node || childMap.find(node) == childMap.end()) return 0;
-
-    int count = 0;
-    for (const NodePtr& child : childMap.at(node)) {
-        count += 1 + countDescendantNodesExternal(child, childMap);
-    }
-    return count;
-}
-
-// --- Q-Learning Loop ---SIMPLE SIMPLE SIMPLE(Only Descendant Reward))
-void qLearning1() {
-	srand(static_cast<unsigned int>(time(0)));
-       	for (int episode = 0; episode < EPISODES; episode++) {
-	       	std::map<NodePtr, std::vector<NodePtr>> childMap;
-	       	NodePtr node = (NodePtr) new Node(); // Root node
-                node->setDepth(0);
-	       	while (!isTerminal(node)) {
-		       	std::vector<double> actions = getActions(...);  // Provide actual args
-                        if (actions.empty()) break;
-
-                        // Initialize Q-values for current state if unseen
-                        if (Q1.find(node) == Q1.end()) {
-			       	Q1[node] = std::vector<double>(actions.size(), 0.0);
-		       	}
-
-                        int action = getEpsilonGreedyAction(actions, Q1[node], EPSILON);
-                        if (action < 0) break;
-
-                        // Branch and get new child node (simulate environment step)
-                        WarmStartPtr ws = nullptr;
-                        Branches branches = nodePrcssr_->getBranches(); // get from processor
-                        NodePtr nextNode = tm_->branch(branches, node, ws);  // Perform branching
-                        if (!nextNode) break;
-
-                        nextNode->setDepth(node->getDepth() + 1);
-		       	// Track child externally
-                        childMap[node].push_back(nextNode);
- 
-                       // Initialize Q for next state if needed
-                       if (Q1.find(nextNode) == Q1.end()) {
-                       Q1[nextNode] = std::vector<double>(actions.size(), 0.0);
-		       }
-
-                       // Calculate reward based on # of descendants
-                       int descendants = countDescendantNodesExternal(nextNode, childMap);
-                       double reward = 1.0 / (descendants + 1);  // +1 to avoid div-by-zero
-
-                       double maxNextQ = *std::max_element(Q1[nextNode].begin(), Q1[nextNode].end());
-
-                       // Q-learning update
-                       Q1[node][action] += ALPHA * (reward + GAMMA * maxNextQ - Q1[node][action]);
-
-                       node = nextNode;
-        }
-    }
-}
-
-
-
-//-------- Q-Learning with Dynamic Rewards----------------
-void qLearning1() {
-    srand(time(0));  // Initialize random seed
-
-    const double beta_ub = 10.0;
-    const double beta_lb = 5.0;
-    const double gamma_descendant = 1.0;
-
-    for (int episode = 0; episode < EPISODES; episode++) {
-        NodePtr node = (NodePtr) new Node();  // Start at root
-        tm_->insertRoot(node);  // Insert root into tree manager
-        double prevUB = tm_->getUb();
-        double prevLB = node->getLb();
-
-        while (!isTerminal(node)) {
-            // Get current state (bounds, etc.)
-            std::vector<std::vector<double>> state = getBounds(...);  // Fill with your real arguments
-
-            // Get available actions (branching variable indices)
-            std::vector<double> actions = getActions(...);  // Fill with actual args
-
-            // Initialize Q-values for this node if not present
-            if (Q1.find(node) == Q1.end()) {
-                Q1[node] = std::vector<double>(actions.size(), 0.0);
-            }
-
-            // Choose action using epsilon-greedy strategy
-            int action = getEpsilonGreedyAction(actions, Q1[node], EPSILON);
-
-            // Save bounds before processing
-            prevUB = tm_->getUb();
-            prevLB = node->getLb();
-
-            // Process the node
-            RelaxationPtr rel = nodeRlxr_->createNodeRelaxation(node, false, false);
-            nodePrcssr_->process(node, rel, solPool_);
-            ++stats_->nodesProc;
-
-            // Get updated bounds
-            double newUB = solPool_->getBestSolutionValue();
-            double newLB = node->getLb();
-
-            // Compute reward components
-            double ubImprovement = (prevUB - newUB > 0) ? (prevUB - newUB) : 0.0;
-            double lbReduction = (prevLB - newLB > 0) ? (prevLB - newLB) : 0.0;
-            int descendantCount = countDescendantNodes(node);
-            double descendantPenalty = 1.0 / (1.0 + descendantCount);
-
-            double reward = beta_ub * ubImprovement + beta_lb * lbReduction + gamma_descendant * descendantPenalty;
-                                                                                                
-            // Select next node (child or candidate)
-            NodePtr nextNode;
-            if (shouldPrune_(node)) {
-                nodeRlxr_->reset(node, false);
-                tm_->pruneNode(node);
-                tm_->removeActiveNode(node);
-                nextNode = tm_->getCandidate();
-            } else {
-                Branches branches = nodePrcssr_->getBranches();
-                WarmStartPtr ws = nodePrcssr_->getWarmStart();
-                tm_->removeActiveNode(node);
-                nextNode = tm_->branch(branches, node, ws);
-
-                if (!nextNode) {
-                    nodeRlxr_->reset(node, false);
-                    nextNode = tm_->getCandidate();
-                }
-            }
-
-            // Initialize Q-values for next node
-            if (nextNode && Q1.find(nextNode) == Q1.end()) {
-                Q1[nextNode] = std::vector<double>(actions.size(), 0.0);
-            }
-
-            // Q-learning update
-            double maxNextQ1 = (nextNode) ? *std::max_element(Q1[nextNode].begin(), Q1[nextNode].end()) : 0.0;
-            Q1[node][action] += ALPHA * (reward + GAMMA * maxNextQ1 - Q1[node][action]);
-
-            node = nextNode;  // Move to the next node
-
-            if (!node) break;  // Terminate if no next node
-        }
-
-        std::cout << "Episode " << episode << " completed." << std::endl;
-    }
-}
-
-
-
-
-// Print the Q-table
-void printQTable1() {
-    cout << fixed << setprecision(2);
-    cout << "\nQ-Table (State-Action Values):\n";
-    for (auto& entry : Q1) {
-        cout << "State " << entry.first << ": ";
-        for (double q_value : entry.second) {
-            cout << setw(8) << q_value << " ";
-        }
-        cout << endl;
-    }
-}
-
 
 bool QLBrancher::getTrustCutoff()
 {
