@@ -11,9 +11,14 @@
 
 #include <cmath>
 #include <iomanip>
-
+#include "QLBrancher.h"
 #include "BranchAndBound.h"
 #include "MinotaurConfig.h"
+#include "BrCand.h"
+#include "BrVarCand.h"
+
+
+
 
 //#define MDBUG 1
 //#define SPEW 1
@@ -21,6 +26,8 @@
 using namespace Minotaur;
 
 const std::string BranchAndBound::me_ = "BranchAndBound: ";
+
+
 
 BranchAndBound::BranchAndBound()
   : env_(0),
@@ -249,6 +256,7 @@ bool BranchAndBound::shouldPrune_(NodePtr node)
   return should_prune;
 }
 
+
 bool BranchAndBound::shouldStop_()
 {
   bool stop_bnb = false;
@@ -325,7 +333,7 @@ void BranchAndBound::showStatus_(bool current_uncounted, bool last_line)
         << std::setw(12)
            << std::setprecision(2) << std::scientific << tm_->getPerGap()
         << std::setw(15) << tm_->getSize() - tm_->getActiveNodes() - off
-        << std::setw(14) << tm_->getActiveNodes() + off 
+       << std::setw(14) << tm_->getActiveNodes() + off 
         << std::setw(7) << std::setprecision(5) << solPool_->getNumSolsFound()
         << std::endl;
     stats_->updateTime = timer_->query();
@@ -445,7 +453,23 @@ void BranchAndBound::solve()
       }
       new_node = tm_->getCandidate();
       dived_prev = false;
-    } else {
+      // ---------Print the Q-Table--------
+     /* std::cout << "======= Q-Table(Episode Ends Here) =======" << std::endl;
+      for (const auto& [state, actionMap] :QLBrancher::Q1) {
+	      std::cout << "State: [ ";
+	      for (double s : state) {
+		      std::cout << std::fixed << std::setprecision(2) << s << " ";
+	      }
+	      std::cout << "]\n";
+	      for (const auto& [action, q_value] : actionMap) {
+		      std::cout << "  Action: " << action
+			      << " => Q-Value: " << std::fixed << std::setprecision(4) << q_value
+			      << std::endl;
+	      }
+	      std::cout << "------------------------" << std::endl;
+      }
+      std::cout << "======= End of Q-Table =======" << std::endl;*/
+} else {
 #if SPEW
       logger_->msgStream(LogDebug) << me_ << "branching" << std::endl;
 #endif
@@ -498,7 +522,43 @@ void BranchAndBound::solve()
           << me_ << "tree ub = " << tm_->getUb() << std::endl;
 #endif
     }
-  }
+ }     
+
+         std::cout << "======= Q-Table(Branch -& - Bound  Ends Here) =======" << std::endl;
+         //BrVarCand* varCand = dynamic_cast<BrVarCand*>(*it);
+         std::cout <<"Brancher Name  " << nodePrcssr_->getBrancher()->getName() << std::endl;	 //->printQTable(Q1);
+         //nodePrcssr_->getBrancher()->printQTable(nodePrcssr_getBrancher()->getQTable());
+	// BrancherPtr br = nodePrcssr_->getBrancher();                    //->printQTable(QLBrancher Q1);
+	 QLBrancher* ql = dynamic_cast<QLBrancher*>(nodePrcssr_->getBrancher());
+	 //QLBrancher::QTable q = ql->getQTable();
+	 ql->printQTable();
+	 //ql->printQTable(q);
+	 
+	 //ql_br->printQTable(Q1);
+	 //QLBrancher qb(env,handlers);
+       //QLBrancher::printQTable(QLBrancher::Q1);
+      // ---------Print the Q-Table--------
+      //BrVarCandPtr action;
+     /* std::cout << "======= Q-Table(Episode Ends Here) =======" << std::endl;
+      for (const auto& [state, actionMap] :QLBrancher::Q1) {
+              std::cout << "State: [ ";
+              for (double s : state) {
+                      std::cout << std::fixed << std::setprecision(2) << s << " ";
+              }
+              std::cout << "]\n";
+              for (const auto& [action, q_value] : actionMap) {
+		       if(action==nullptr) {
+                              std::cerr << "action is null!" << std::endl;
+                      }
+		      //BrVarCand* varCand = dynamic_cast<BrVarCand*>(action);
+		      std::cout <<"Action :" << varCand->getName() << std::endl;  //Calls BrVarCand::getName()
+										  
+		      std::cout << " => Q-Value: " << std::fixed << std::setprecision(4) << q_value << std::endl;
+              }
+              std::cout << "------------------------" << std::endl;
+      }
+      std::cout << "======= End of Q-Table =======" << std::endl;
+*/
   showStatus_(false, true);
   //logger_->msgStream(LogError) << " " << std::endl;
   logger_->msgStream(LogError)

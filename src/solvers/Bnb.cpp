@@ -6,7 +6,7 @@
 
 /**
  * \file Bnb.cpp
- * \brief The Bnb class for solving instances in mps or ampl format (.nl) by
+ * \brief The Bnb class for solving instances in ampl format (.nl) by
  * using Branch-and-Bound alone.
  * \author Ashutosh Mahajan, IIT Bombay
  */
@@ -37,6 +37,7 @@
 #include "Presolver.h"
 #include "RandomBrancher.h"
 #include "ReliabilityBrancher.h"
+#include "/home/kkishan/minotaur/src/base/QLBrancher.h"
 #include "TreeManager.h"
 
 #include "FixVarsHeur.h"
@@ -53,7 +54,9 @@
 #include "AMPLJacobian.h"
 
 using namespace Minotaur;
-const std::string Bnb::me_ = "mbnb: ";
+const std::string Bnb::me_ = "Bnb: ";
+
+
 
 Bnb::Bnb(EnvPtr env)
   : objSense_(1.0),
@@ -121,6 +124,8 @@ BranchAndBound* Bnb::getBab_(Engine* engine, HandlerVector& handlers)
   }
   if(handlers.size() > 1) {
     PCBProcessorPtr pproc = new PCBProcessor(env_, engine, handlers);
+    sp = new SppHeur(env_, oinst_);
+    pproc->addHeur(sp);
     nproc = pproc;
   } else {
     nproc = (BndProcessorPtr) new BndProcessor(env_, engine, handlers);
@@ -216,6 +221,33 @@ BrancherPtr Bnb::getBrancher_(HandlerVector handlers, EnginePtr e)
         << "reliability branching iteration limit = " << rel_br->getIterLim()
         << std::endl;
     br = rel_br;
+  } else if(brancher == "ql" ||  brancher == "rel" || brancher == "hybrid")  {
+   // br = (QLBrancherPtr) new QLBrancher(env_, handlers);
+    QLBrancherPtr ql_br;
+    ql_br = (QLBrancherPtr) new QLBrancher(env_, handlers);
+    ql_br->setEngine(e);
+    t = (oinst_->getSize()->ints + oinst_->getSize()->bins) / 10;
+    t = std::max(t, (UInt)2);
+    t = std::min(t, (UInt)4);
+    ql_br->setThresh(t);
+    env_->getLogger()->msgStream(LogExtraInfo)
+        << me_ << "setting reliability threshhold to " << t << std::endl;
+    t = (UInt)oinst_->getSize()->ints + oinst_->getSize()->bins / 20 + 2;
+    t = std::min(t, (UInt)10);
+    ql_br->setMaxDepth(t);
+    env_->getLogger()->msgStream(LogExtraInfo)
+        << me_ << "setting reliability maxdepth to " << t << std::endl;
+    if(e->getName() == "filter-sqp") {
+      ql_br->setIterLim(5);
+    }
+    env_->getLogger()->msgStream(LogExtraInfo)
+        << me_
+        << "reliability branching iteration limit = " << ql_br->getIterLim()
+        << std::endl;
+    br = ql_br;
+
+
+
   } else if(env_->getOptions()->findString("brancher")->getValue() ==
             "maxvio") {
     br = (MaxVioBrancherPtr) new MaxVioBrancher(env_, handlers);
@@ -254,11 +286,6 @@ BrancherPtr Bnb::getBrancher_(HandlerVector handlers, EnginePtr e)
   }
   env_->getLogger()->msgStream(LogExtraInfo)
       << me_ << "brancher used = " << br->getName() << std::endl;
-  //env_->getLogger()->msgStream(LogInfo) << me_  << "time before starting BAB
-  //= " << std::fixed << std::setprecision(2) << env_->getTime() << std::endl;
-  if (timeCheck() == true) {
-    return 0;
-  }
   return br;
 }
 
@@ -266,23 +293,6 @@ void Bnb::doSetup()
 {
   setInitialOptions_();
 }
-
-
-std::string Bnb::getAbout()
-{
-  std::ostringstream ostr;
-        
-  ostr << me_ 
-       << "Minotaur version " << env_->getVersion()
-       << std::endl
-       << me_ << "NLP based Branch-and-bound algorithm for convex MINLP"
-       << std::endl
-       << me_ << "Visit https://minotaur-solver.github.io/ for details" 
-       << std::endl
-       << std::endl;
-  return ostr.str();
-}
-
 
 int Bnb::getEngine_(Engine** e)
 {
@@ -401,12 +411,13 @@ void Bnb::setInitialOptions_()
 void Bnb::showHelp() const
 {
   env_->getLogger()->errStream()
+      << "NLP based Branch-and-bound algorithm for convex MINLP" << std::endl
       << "Usage:" << std::endl
       << "To show version: bnb -v (or --display_version yes) " << std::endl
       << "To show all options: bnb -= (or --display_options yes)" << std::endl
       << "To solve an instance: bnb --option1 [value] "
       << "--option2 [value] ... "
-      << " file.[mps|nl]" << std::endl;
+      << " .nl-file" << std::endl;
 }
 
 int Bnb::showInfo()
@@ -427,24 +438,31 @@ int Bnb::showInfo()
 
   if(options->findBool("display_version")->getValue() ||
      options->findFlag("v")->getValue()) {
-    env_->getLogger()->msgStream(LogNone) << getAbout();
+    env_->getLogger()->msgStream(LogNone)
+        << me_ << "Minotaur version " << env_->getVersion() << std::endl;
+    env_->getLogger()->msgStream(LogNone)
+        << me_ << "NLP based Branch-and-bound algorithm for convex MINLP"
+        << std::endl;
     return 1;
   }
 
   // code for printing whether we use cgtoqf or not
 
   if(options->findBool("cgtoqf")->getValue() == 1) {
-    env_->getLogger()->msgStream(LogDebug)
+    env_->getLogger()->msgStream(LogInfo)
         << me_ << "Using quadratic function to store quadratic problem."
         << std::endl;
   } else {
-    env_->getLogger()->msgStream(LogDebug)
+    env_->getLogger()->msgStream(LogInfo)
         << me_ << "Using cgraph function to store non-quadratic problem."
         << std::endl;
   }
   // code ended
 
-  env_->getLogger()->msgStream(LogInfo) << getAbout();
+  env_->getLogger()->msgStream(LogInfo)
+      << me_ << "Minotaur version " << env_->getVersion() << std::endl
+      << me_ << "NLP based Branch-and-bound algorithm for convex MINLP"
+      << std::endl;
   return 0;
 }
 
@@ -496,10 +514,6 @@ int Bnb::solve(ProblemPtr p)
     oinst_->setInitialPoint(iface_->getInitialPoint(),
                             oinst_->getNumVars() - iface_->getNumDefs());
   }
-  
-  if (env_->getOptions()->findInt("log_level")->getValue() == 2) {
-    oinst_->statistics(env_->getLogger()->msgStream(LogInfo));
-  }
 
   if(oinst_->getObjective() &&
      oinst_->getObjective()->getObjectiveType() == Maximize) {
@@ -511,14 +525,6 @@ int Bnb::solve(ProblemPtr p)
     objSense_ = 1.0;
     env_->getLogger()->msgStream(LogInfo)
         << me_ << "objective sense: minimize" << std::endl;
-  }
-
-  env_->getLogger()->msgStream(LogInfo)
-      << me_ << "time after constraint classification = " << std::fixed
-      << std::setprecision(2) << env_->getTime() << std::endl;
-
-  if (timeCheck() == true) {
-    return 0;
   }
 
   // First store all original variables in a vector, then presolve.
@@ -540,16 +546,7 @@ int Bnb::solve(ProblemPtr p)
               iface_);
     goto CLEANUP;
   }
-
-  env_->getLogger()->msgStream(LogInfo)
-      << me_ << "time after presolve = " << std::fixed << std::setprecision(2)
-      << env_->getTime() << std::endl;
-
-  if (timeCheck() == true) {
-    return 0;
-  }
-
-  if (options->findBool("solve")->getValue() == false) {
+  if(options->findBool("solve")->getValue() == false) {
     env_->getLogger()->msgStream(LogInfo)
         << me_ << "Solve option is set to 0, Stopping further processing."
         << std::endl;
