@@ -211,6 +211,7 @@ BASE_SRCS = \
         $(BASE_DIR)/Problem.cpp \
         $(BASE_DIR)/ProbStructure.cpp  \
         $(BASE_DIR)/QGHandler.cpp  \
+        $(BASE_DIR)/QLBrancher.cpp  \
         $(BASE_DIR)/QPDRelaxer.cpp  \
         $(BASE_DIR)/QPDProcessor.cpp  \
         $(BASE_DIR)/QuadHandler.cpp  \
@@ -334,6 +335,7 @@ ALL_HEADERS = \
         $(BASE_DIR)/ProbStructure.h \
         $(BASE_DIR)/QPEngine.h \
         $(BASE_DIR)/QGHandler.h \
+        $(BASE_DIR)/QLBrancher.h  \
         $(BASE_DIR)/QPDProcessor.h  \
         $(BASE_DIR)/QuadHandler.h  \
         $(BASE_DIR)/QPDRelaxer.h  \
