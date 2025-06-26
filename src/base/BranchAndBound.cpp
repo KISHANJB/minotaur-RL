@@ -139,7 +139,8 @@ UInt BranchAndBound::numProcNodes()
 
 NodePtr BranchAndBound::processRoot_(bool* should_prune, bool* should_dive)
 {
-  NodePtr current_node = (NodePtr) new Node();
+  //NodePtr current_node = (NodePtr) new Node();
+  NodePtr current_node = new Node(); 
   NodePtr new_node = NodePtr(); // NULL
   RelaxationPtr rel;
   bool prune = *should_prune;
@@ -386,7 +387,9 @@ void BranchAndBound::solve()
 
   // do the root
   current_node = processRoot_(&should_prune, &dived_prev);
-  current_node2 = current_node;
+  //Node current_node2 =  new Node(*current_node);
+  Node root_node = *(current_node->getParent());
+  //current_node2 = &root_node;
 
   // stop if done
   if(!current_node) {
@@ -461,9 +464,24 @@ void BranchAndBound::solve()
       }
       new_node = tm_->getCandidate();
       dived_prev = false;
-      current_node = current_node2;
-      std::cout << "===============================================EPISODE No. " << episode << " ENDS HERE================================ "   << std::endl;
+      current_node = &root_node;
+      //current_node = current_node2;
+      std::cout << " =============================================== EPISODE No. " << episode << " ENDS HERE================================ "   << std::endl;
       episode = episode + 1;
+      /*ActiveNodeStorePtr an;
+      NodePtr n;
+      NodePtrIterator node_i;
+      if (tm_->aNode_) {
+	      removeNodeAndUp_(tm_->aNode_);
+      }
+      while (false==tm_->activeNodes_->isEmpty()) {
+      n = tm_->activeNodes_->top();
+      tm_->removeNodeAndUp_(n);
+      tm_->activeNodes_->pop();
+      }*/
+      tm_->emptyNodeStore();
+      std::cout << "All nodes have been removed" << std::endl;
+      // tm_->clearAll();
       continue;
 
 
