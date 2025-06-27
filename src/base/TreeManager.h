@@ -27,7 +27,7 @@ namespace Minotaur {
   
   /// Base class for managing the branch-and-bound tree. 
   class TreeManager {
-
+      
   public:
     /// Constructor.
     TreeManager(EnvPtr env);
@@ -149,6 +149,9 @@ namespace Minotaur {
      * \return the updated lower bound.
      */
     double updateLb();
+    void removeAnc(NodePtr node);
+    void keepRoot();
+    void emptyNodeStore(){ clearAll(); }
 
   private:
     /// Set of nodes that are still active (those who need to be processed).

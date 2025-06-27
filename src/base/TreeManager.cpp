@@ -150,6 +150,50 @@ void TreeManager::clearAll()
   }
 }
 
+/*
+void TreeManager::keepRoot()
+{ 
+  int rcount = 0;
+  NodePtr n;
+  NodePtrIterator node_i;
+  
+  if (aNode_) {
+    removeNodeAndUp_(aNode_);
+  }
+  while (true) {
+    n = activeNodes_->top();
+    if(n->getDepth()==0){
+      //rcount = rcount+1;
+      //continue;
+      break;
+    }
+    //delete n;
+    //removeAnc(n);
+    //removeNodeAndUp_(n);
+    activeNodes_->pop();
+  }
+}
+
+*/
+
+void TreeManager::keepRoot()
+{
+  NodePtr n;
+  NodePtrIterator node_i;
+
+  if (aNode_ && aNode_->getDepth() != 0) {
+    removeNodeAndUp_(aNode_);
+  }
+  while (false==activeNodes_->isEmpty()) {
+    n = activeNodes_->top();
+    removeAnc(n);
+    activeNodes_->pop();
+  }
+}
+
+
+
+
 
 UInt TreeManager::getActiveNodes() const
 {
@@ -295,7 +339,7 @@ void TreeManager::removeActiveNode(NodePtr node)
 void TreeManager::removeNode_(NodePtr node) 
 {
   NodePtr cNode = 0;
-  NodePtr  parent = node->getParent();;
+  NodePtr  parent = node->getParent();
   NodePtrIterator node_i;
 
   if (node->getId()>0) {
@@ -348,7 +392,43 @@ void TreeManager::removeNodeAndUp_(NodePtr node)
   }
 }
 
+void TreeManager::removeAnc(NodePtr node)
+{
+  NodePtr parent = node->getParent();
 
+  // remove the given node
+  removeNode_(node);
+
+  // remove the ancestors of the given node, if they have no children left
+  while (parent && parent->getNumChildren()==0) {
+    node = parent;
+    parent = node->getParent();
+    removeNode_(node);
+    if (parent->getDepth() == 0){
+	    break;
+    }
+  }
+}
+
+
+
+
+/*
+void TreeManager::removeAnc(NodePtr node)
+{
+  NodePtr parent = node->getParent();
+
+  // remove the given node
+  removeNode_(node);
+
+  // remove the ancestors of the given node, if they have no children left
+  while (parent->getDepth()!=0) {
+    node = parent;
+    parent = node->getParent();
+    removeNode_(node);
+  }
+}
+*/
 void TreeManager::setCutOff(double value)
 {
   cutOff_ = value;
