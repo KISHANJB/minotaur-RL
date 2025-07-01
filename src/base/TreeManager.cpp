@@ -181,16 +181,36 @@ void TreeManager::keepRoot()
   NodePtr n;
   NodePtrIterator node_i;
 
-  if (aNode_ && aNode_->getDepth() != 0) {
+  if (aNode_) {
     removeNodeAndUp_(aNode_);
   }
   while (false==activeNodes_->isEmpty()) {
     n = activeNodes_->top();
-    removeAnc(n);
+    if(n->getDepth()== 0){
+	    break;
+    }
+    removeNodeAndUp_(n);
     activeNodes_->pop();
   }
 }
 
+void TreeManager::keepNode(int c_id)
+{
+  NodePtr n;
+  NodePtrIterator node_i;
+
+  if (aNode_) {
+    removeNodeAndUp_(aNode_);
+  }
+  while (false==activeNodes_->isEmpty()) {
+    n = activeNodes_->top();
+    if(n->getId() == c_id){
+            break;
+    }
+    removeNodeAndUp_(n);
+    activeNodes_->pop();
+  }
+}
 
 
 
@@ -375,7 +395,6 @@ void TreeManager::removeNode_(NodePtr node)
   } 
   delete node;
 }
-
 
 void TreeManager::removeNodeAndUp_(NodePtr node) 
 {

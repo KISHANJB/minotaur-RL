@@ -208,6 +208,78 @@ NodePtr BranchAndBound::processRoot_(bool* should_prune, bool* should_dive)
   return current_node;
 }
 
+
+NodePtr BranchAndBound::processRoot2_(bool* should_prune, bool* should_dive)
+{
+  //NodePtr current_node = (NodePtr) new Node();
+  NodePtr current_node = new Node(); 
+  NodePtr new_node = NodePtr(); // NULL
+  RelaxationPtr rel;
+  bool prune = *should_prune;
+  Branches branches = 0;
+  WarmStartPtr ws;
+
+/*#if SPEW
+  logger_->msgStream(LogDebug) << me_ << "creating root node" << std::endl;
+#endif
+*/
+  showStatusHead_();
+//  tm_->insertRoot(current_node);
+
+  if(options_->createRoot == true) {
+    rel = nodeRlxr_->createRootRelaxation(current_node, solPool_, prune);
+    rel->setProblem(problem_);
+  } else {
+    rel = nodeRlxr_->getRelaxation();
+  }
+  // We may find a solution while creating a relaxation. Setting upper bound here.
+  tm_->setUb(solPool_->getBestSolutionValue());
+
+  if(!prune) {
+    // solve the root node only if the initial root relaxation is not pruned
+    // because of the unboundedness or infeasibility or something else
+#if SPEW
+    logger_->msgStream(LogDebug) << me_ << "processing root node" << std::endl;
+#endif
+
+    nodePrcssr_->processRootNode(current_node, rel, solPool_);
+    ++stats_->nodesProc;
+    if(nodePrcssr_->foundNewSolution()) {
+      tm_->setUb(solPool_->getBestSolutionValue());
+    }
+
+    prune = shouldPrune_(current_node);
+  }
+  if(prune) {
+    nodeRlxr_->reset(current_node, false);
+    tm_->pruneNode(current_node);
+    tm_->removeActiveNode(current_node);
+  } else {
+#if SPEW
+    logger_->msgStream(LogDebug) << me_ << "branching in root" << std::endl;
+#endif
+    // branch.
+    branches = nodePrcssr_->getBranches();
+    ws = nodePrcssr_->getWarmStart();
+    tm_->removeActiveNode(current_node);
+    *should_dive = tm_->shouldDive();
+    new_node = tm_->branch(branches, current_node, ws);
+    assert((*should_dive && new_node) || (!(*should_dive) && !new_node));
+    if(!(*should_dive)) {
+      nodeRlxr_->reset(current_node, false);
+      new_node = tm_->getCandidate();
+      assert(new_node);
+    }
+  }
+  current_node = new_node;
+
+  tm_->updateLb();
+
+  showStatus_(*should_dive, false);
+  *should_prune = prune;
+  return current_node;
+}
+
 void BranchAndBound::setLogLevel(LogLevel level)
 {
   logger_->setMaxLevel(level);
@@ -355,7 +427,10 @@ void BranchAndBound::solve()
   bool should_stop = false;
   double tstart = timer_->query();
   int episode = 1;
-  
+  int gate = 0;
+  int c_id = 0;
+
+
   logger_->msgStream(LogInfo)
       << me_ << "starting branch-and-bound" << std::endl;
 
@@ -386,10 +461,11 @@ void BranchAndBound::solve()
   tm_->setUb(solPool_->getBestSolutionValue());
 
   // do the root
+  std::cout << " Process Root Visited " << std::endl;
   current_node = processRoot_(&should_prune, &dived_prev);
-  //Node current_node2 =  new Node(*current_node);
-  Node root_node = *(current_node->getParent());
-  //current_node2 = &root_node;
+  c_id = current_node->getId();
+  current_node2 = current_node;
+  //current_node2 = current_node->getParent();
 
   // stop if done
   if(!current_node) {
@@ -429,15 +505,24 @@ void BranchAndBound::solve()
         << me_ << "did we dive = " << dived_prev << std::endl;
 #endif
      if (episode > 1000){
-            std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MAX EPISODE LIMIT REACHED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+            std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MAX EPISODE LIMIT REACHED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
             break;
     }
-    //std::cout << "EPISODE No. " << episode << std::endl;
-
+     
     should_dive = false;
+   /* if(gate == 1){
+     current_node = processRoot2_(&should_prune, &dived_prev);
+     }
+    else {
     rel =
         nodeRlxr_->createNodeRelaxation(current_node, dived_prev, should_prune);
     nodePrcssr_->process(current_node, rel, solPool_);
+    }*/
+
+    rel =
+        nodeRlxr_->createNodeRelaxation(current_node, dived_prev, should_prune);
+    nodePrcssr_->process(current_node, rel, solPool_);
+
 
     ++stats_->nodesProc;
 #if SPEW
@@ -464,24 +549,13 @@ void BranchAndBound::solve()
       }
       new_node = tm_->getCandidate();
       dived_prev = false;
-      current_node = &root_node;
-      //current_node = current_node2;
+      //current_node = &root_node;
+      current_node = current_node2;
       std::cout << " =============================================== EPISODE No. " << episode << " ENDS HERE================================ "   << std::endl;
       episode = episode + 1;
-      /*ActiveNodeStorePtr an;
-      NodePtr n;
-      NodePtrIterator node_i;
-      if (tm_->aNode_) {
-	      removeNodeAndUp_(tm_->aNode_);
-      }
-      while (false==tm_->activeNodes_->isEmpty()) {
-      n = tm_->activeNodes_->top();
-      tm_->removeNodeAndUp_(n);
-      tm_->activeNodes_->pop();
-      }*/
-      tm_->emptyNodeStore();
+      //gate =1;
+      tm_->keepNode(c_id);
       std::cout << "All nodes have been removed" << std::endl;
-      // tm_->clearAll();
       continue;
 
 

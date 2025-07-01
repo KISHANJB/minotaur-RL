@@ -152,7 +152,7 @@ namespace Minotaur {
     void removeAnc(NodePtr node);
     void keepRoot();
     void emptyNodeStore(){ clearAll(); }
-
+    void keepNode(int c_id);
   private:
     /// Set of nodes that are still active (those who need to be processed).
     ActiveNodeStorePtr activeNodes_; 
