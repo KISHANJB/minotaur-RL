@@ -424,6 +424,7 @@ void BranchAndBound::solve()
   Branches branches = 0;
   WarmStartPtr ws;
   RelaxationPtr rel = RelaxationPtr();
+  RelaxationPtr rel2 = RelaxationPtr();
   bool should_stop = false;
   double tstart = timer_->query();
   int episode = 1;
@@ -510,18 +511,21 @@ void BranchAndBound::solve()
     }
      
     should_dive = false;
-   /* if(gate == 1){
-     current_node = processRoot2_(&should_prune, &dived_prev);
+    if(gate == 1){
+     //current_node = processRoot2_(&should_prune, &dived_prev);
+      rel = rel2;
+      nodePrcssr_->process(current_node, rel, solPool_);
      }
     else {
     rel =
         nodeRlxr_->createNodeRelaxation(current_node, dived_prev, should_prune);
+      rel2 = rel;
     nodePrcssr_->process(current_node, rel, solPool_);
-    }*/
+    }
 
-    rel =
+    /*rel =
         nodeRlxr_->createNodeRelaxation(current_node, dived_prev, should_prune);
-    nodePrcssr_->process(current_node, rel, solPool_);
+    nodePrcssr_->process(current_node, rel, solPool_);*/
 
 
     ++stats_->nodesProc;
