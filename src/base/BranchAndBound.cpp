@@ -557,7 +557,7 @@ void BranchAndBound::solve()
       current_node = current_node2;
       std::cout << " =============================================== EPISODE No. " << episode << " ENDS HERE================================ "   << std::endl;
       episode = episode + 1;
-      //gate =1;
+      gate = 1;
       tm_->keepNode(c_id);
       std::cout << "All nodes have been removed" << std::endl;
       continue;
