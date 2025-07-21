@@ -182,13 +182,13 @@ private:
  // std::map<NodePtr, std::vector<double>> Q1;
   BrCandPtr findBestCandidate_(const double objval, double cutoff, 
                                NodePtr node);
-   QTable qtable_;     
+  QTable qtable_;     
 //  TreeManagerPtr tm_;
  // Minotaur::NodeRelaxerPtr nodeRlxr_;
-  Minotaur::EnvPtr env_;
+  //Minotaur::EnvPtr env_;
  // Minotaur::ProblemHandlerPtr handler_;
-  Minotaur::EnginePtr engine_; 
-  Minotaur::SolutionPoolPtr solPool_;
+  //Minotaur::EnginePtr engine_; 
+  //Minotaur::SolutionPoolPtr solPool_;
  // Minotaur::BrancherStats *stats_;
   /**
    * \brief Find and sort candidates for branching.
@@ -313,7 +313,7 @@ void getPCScore_(BrCandPtr cand, double *ch_down, double *ch_up,
   void writeScores_(std::ostream &out);
 
   /// The engine used for strong branching.
-  //EnginePtr engine_;
+  EnginePtr engine_;
 
   /// Tolerance for avoiding division by zero.
   const double eTol_;

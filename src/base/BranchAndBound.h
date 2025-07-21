@@ -76,7 +76,10 @@ namespace Minotaur {
     NodeProcessorPtr getNodeProcessor();
 
     /// Return a pointer to NodeRelaxer used in branch-and-bound.
-    NodeRelaxerPtr getNodeRelaxer(); 
+    NodeRelaxerPtr getNodeRelaxer();
+
+   /// Return a pointer to the brancher used in branch-and-bound
+
 
     /*
      * \brief Return solution from the last solve. If no solution was found, return
@@ -152,6 +155,9 @@ namespace Minotaur {
 
     /// Write statistics to the logger
     void writeStats();
+
+    NodePtr processRoot2_(bool* should_prune, bool* should_dive);
+
 
   private:
     /// Pointer to the enviroment.

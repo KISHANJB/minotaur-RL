@@ -26,6 +26,7 @@
 using namespace Minotaur;
 
 const std::string BranchAndBound::me_ = "BranchAndBound: ";
+ActiveNodeStorePtr activeNodes;
 
 
 
@@ -511,21 +512,18 @@ void BranchAndBound::solve()
     }
      
     should_dive = false;
-    if(gate == 1){
-     //current_node = processRoot2_(&should_prune, &dived_prev);
-      rel = rel2;
-      nodePrcssr_->process(current_node, rel, solPool_);
+   /* if(gate == 1){
+     current_node = processRoot2_(&should_prune, &dived_prev);
      }
     else {
     rel =
         nodeRlxr_->createNodeRelaxation(current_node, dived_prev, should_prune);
-      rel2 = rel;
     nodePrcssr_->process(current_node, rel, solPool_);
-    }
+    }*/
 
-    /*rel =
+    rel =
         nodeRlxr_->createNodeRelaxation(current_node, dived_prev, should_prune);
-    nodePrcssr_->process(current_node, rel, solPool_);*/
+    nodePrcssr_->process(current_node, rel, solPool_);
 
 
     ++stats_->nodesProc;
@@ -559,7 +557,14 @@ void BranchAndBound::solve()
       episode = episode + 1;
       gate = 1;
       tm_->keepNode(c_id);
-      std::cout << "All nodes have been removed" << std::endl;
+      std::cout << "No. of Remaining Nodes = " << tm_->getActiveNodes() << std::endl;
+    /*  ActiveNodeStorePtr copyStore = activeNodes->clone();
+      while (!copyStore->isEmpty()) {
+      NodePtr node = copyStore->top();
+      std::cout << "Node ID: " << node->getId() << std::endl;  // example
+      copyStore->pop();
+     } */
+     //std::cout << "All nodes have been removed" << std::endl;
       continue;
 
 
@@ -651,6 +656,10 @@ void BranchAndBound::solve()
       << me_ << "nodes created   = " << tm_->getSize() << std::endl;
   stats_->timeUsed = timer_->query()-tstart;
 }
+
+
+
+
 
 void BranchAndBound::writeStats(std::ostream& out)
 {

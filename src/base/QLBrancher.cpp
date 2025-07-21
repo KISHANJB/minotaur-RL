@@ -14,6 +14,7 @@
 #include <cmath>
 #include <omp.h>
 #include <random>
+#include <typeinfo>
 #include "BrCand.h"
 #include "BrVarCand.h"
 #include "Branch.h"
@@ -52,12 +53,12 @@ const std::string QLBrancher::me_ = "QL brancher: ";
 const int EPISODES = 100;
 const double ALPHA = 0.1;     // Learning rate
 const double GAMMA = 0.95;    // Discount factor
-const double EPSILON = 0.5;   // Exploration rate
+const double EPSILON = 0.2;   // Exploration rate
 static constexpr double DEFAULT_Q = 0.0; // <-- Default value here
 //std::vector<double> state;
 //std::vector<double> current_state;
 //std::vector<double> prev_state;
-Minotaur::BrCandPtr  prev_best_cand,best_cand,action;// Using prev_best_cand to store the action taken for the previous state or at the parent node. 
+Minotaur::BrCandPtr  prev_best_cand, best_cand, action,root_best_cand;         // Using prev_best_cand to store the action taken for the previous state or at the parent node. 
 
 //QTable QLBrancher::Q1;
 
@@ -69,7 +70,7 @@ Minotaur::BrCandPtr  prev_best_cand,best_cand,action;// Using prev_best_cand to 
 ***/
 
 QLBrancher::QLBrancher(EnvPtr env, HandlerVector& handlers)
-  : qtable_(),
+  : //qtable_(),
     engine_(EnginePtr()), // NULL
     eTol_(1e-6),
     handlers_(handlers), // Create a copy, the vector is not too big
@@ -125,30 +126,54 @@ QLBrancher::~QLBrancher()
 
 
 
+void QLBrancher::printQTable() {
+	std::cout << "======= Q-Table  =======" << std::endl;
+	for (const auto& entry : qtable_) {
+		std::cout << "State: [ ";
+		for (double s : entry.first) {
+			std::cout << std::fixed << std::setprecision(2) << s << " ";
+		}
+		std::cout << "]\n";
+		for (const auto& subentry : entry.second) {
+			if (subentry.first != nullptr){
+                        BrVarCandPtr vc = dynamic_cast<BrVarCand*>(subentry.first);
+			std::cout << "  Action: " << vc->getName()
+				<< " => Q-Value: " << std::fixed << std::setprecision(4)
+				<< subentry.second << std::endl;
+			}
+			else {
+				std::cout << "  Action: NULL " << std::endl; 
+			}
+		std::cout << "------------------------" << std::endl;
+	}
+	std::cout << "======= End of Q-Table =======" << std::endl;
+	}
 
-// Print the Q-table
-void printQTable() {
-    std::cout << "======= Q-Table =======" << std::endl;
-
-    for (const auto& [state, actionMap] : qtable_) {
-        std::cout << "State: [ ";
-        for (double s : state) {
-            std::cout << std::fixed << std::setprecision(2) << s << " ";
-        }
-        std::cout << "]\n";
-
-        for (const auto& [action, q_value] : actionMap) {
-            std::cout << "  Action: " << action->getName()
-                      << " => Q-Value: " << std::fixed << std::setprecision(4) << q_value
-                      << std::endl;
-        }
-        std::cout << "------------------------" << std::endl;
-    }
-
-    std::cout << "======= End of Q-Table =======" << std::endl;
 }
 
 
+
+
+
+// Print the Q-tabl
+/*void QLBrancher::printQTable() {
+	for (const auto& [state, actionMap] : qtable_) {
+                  std::cout << "State: [ ";
+                  for (double s : state) {
+                          std::cout << std::fixed << std::setprecision(2) << s << " ";
+                  }
+                  std::cout << "]\n";
+                  for (const auto& [action, q_value] : actionMap) {
+                          std::cout << "  Action: " << action->getName()                 //name
+                                  << " => Q-Value: " << std::fixed << std::setprecision(4) << q_value
+                                  << std::endl;
+                  }
+                  std::cout << "------------------------" << std::endl;
+          }
+          std::cout << "======= End of Q-Table =======" << std::endl;
+}
+
+*/
 
 
 BrCandPtr QLBrancher::findBestCandidate_(const double objval,
@@ -157,33 +182,51 @@ BrCandPtr QLBrancher::findBestCandidate_(const double objval,
   double best_score = -INFINITY;
   double score, change_up, change_down, maxchange;
   UInt cnt, maxcnt;
+  UInt depth = node->getDepth();
   EngineStatus status_up, status_down;
   BrCandPtr cand;
   std::vector<double> upperBounds;
+  static std::vector<double> prev_state={},root_state={};
   static std::vector<double> current_state={};
+  // why static here?
   static BrCandPtr best_cand = 0;
+  //BrCandPtr cand, action, best_cand = 0;
   prev_state=current_state;
   prev_best_cand = best_cand;
+  //BrCandPtr  prev_best_cand, best_cand, action;         // Using prev_best_cand to store the action taken for the previous state or at the parent node. 
   decltype(relCands_) var = relCands_;
   var.insert(var.end(),unrelCands_.begin(), unrelCands_.end());  // Automatically avoids duplicates
 
 
   for(BrCandVIter it = var.begin(); it != var.end(); ++it) {
-                BrVarCand* varCand = dynamic_cast<BrVarCand*>(*it);
+                BrVarCandPtr varCand = dynamic_cast<BrVarCand*>(*it);
                 double  lb = varCand->getVar()->getLb();
                 double  ub = varCand->getVar()->getUb();
                 current_state.push_back(lb);          // Collect LB
                 upperBounds.push_back(ub);          // Collect UB
   }
   current_state.insert(current_state.end(), upperBounds.begin(), upperBounds.end());//Finally getting the current state vector----
+   if (node->getDepth() == 0){
+	   root_state = current_state;
+   }
+   if (node->getParent()->getDepth() == 0){
+	   prev_state = root_state;
+	   prev_best_cand = root_best_cand;
+   }
 
 
+   /*if (current_state == prev_state){
+	   prev_state = root_state;
+	   prev_best_cand = root_best_cand;
+   }*/
 
-
-/** -------------------------------------------------------------- RL Framework starts here-------------------------------------------------------------------------------------------*/
-
+     /** -------------------------------------------------------------- RL Framework starts here------------------------------------------------------------------------------*/
 
   if((node->getDepth())>0) {
+	/* if (node->getParent()->getDepth() == 0){
+           prev_state = root_state;
+           prev_best_cand = root_best_cand;
+	 }*/
          double current_lb,prev_lb,delta_lb;
     //---- Fetching lower bounds on the optimal solution for calculating reward----
          current_lb= node->getLb();
@@ -193,6 +236,7 @@ BrCandPtr QLBrancher::findBestCandidate_(const double objval,
    //---- Q-value updates--------
          double maxNextQ = 0.0;  // Since nextState is always unseen, assume max Q-value is 0
          double qsa = 0;
+	 std::string prev_action;
         // if (!prev_state.empty() && prev_best_cand) {
          	auto s_entry = qtable_.find(prev_state);
          	qsa = DEFAULT_Q;
@@ -201,6 +245,11 @@ BrCandPtr QLBrancher::findBestCandidate_(const double objval,
          		qsa = (a_entry != s_entry->second.end()) ? a_entry->second : DEFAULT_Q;
          	}
          	qsa += ALPHA * (delta_lb + GAMMA * maxNextQ - qsa);
+		//prev_action = prev_best_cand->getName();
+	//	qtable_[prev_state][prev_action] = qsa;
+	        //std::cout << "BrCand Pointer" << prev_best_cand << std::endl;	
+	        //std::cout << "Variable Name" << prev_action << std::endl;
+		//std::cout << "variable Pointer" << &(prev_best_cand->getName()) <<std::endl;
          	qtable_[prev_state][prev_best_cand] = qsa;
         // }
 
@@ -246,6 +295,24 @@ BrCandPtr QLBrancher::findBestCandidate_(const double objval,
 		best_cand = best_actions[tie_dist(gen)];
 		
 	 }
+	 std::cout << "State: [ ";
+                for (double s : prev_state) {
+                        std::cout << std::fixed << std::setprecision(2) << s << " ";
+                }
+                std::cout << "]\n";
+        /*BrVarCandPtr vc = dynamic_cast<BrVarCand*>(prev_best_cand);
+	if (vc) {
+		std::cout << "  Action: " << vc->getName()
+		          << " => Q-Value: " << std::fixed << std::setprecision(4) << qsa
+                                  << std::endl;
+	} else {
+		std::cout << "  Action: " << prev_best_cand->getName()
+	                  << " => Q-Value: " << std::fixed << std::setprecision(4) << qsa
+                                  << std::endl;	
+	}*/
+	std::cout << "  Action: " << prev_best_cand->getName() 
+	          << " => Q-Value: " << std::fixed << std::setprecision(4) << qsa
+		  << std::endl;
 	 return best_cand;
 
   } else {
@@ -320,6 +387,7 @@ BrCandPtr QLBrancher::findBestCandidate_(const double objval,
       //std::cout << "in ql: no bestcand at node " << node->getId() << "\n";
     //}
    // std::cout <<"Reliable best_cand" << best_cand->getName() << "\n";
+    root_best_cand = best_cand;
     return best_cand;
   }
 }
@@ -337,9 +405,10 @@ Branches QLBrancher::findBranches(RelaxationPtr rel, NodePtr node,
   BrCandPtr br_can = 0;
   const double* x = sol->getPrimal();
   UInt depth = node->getDepth(); 
-  if (depth % 20 == 2) {
-	  std::cout << "======= Q-Table(depth = "<< depth << ") =======" << std::endl;
-	  for (const auto& [state, actionMap] : qtable_) {
+  /*if (depth % 20 == 2) {
+	 std::cout << "======= Q-Table(depth = "<< depth << ") =======" << std::endl;
+	 //printQTable();
+	 for (const auto& [state, actionMap] : qtable_) {
 		  std::cout << "State: [ ";
 		  for (double s : state) {
 			  std::cout << std::fixed << std::setprecision(2) << s << " ";
@@ -354,7 +423,16 @@ Branches QLBrancher::findBranches(RelaxationPtr rel, NodePtr node,
 	  }
 	  std::cout << "======= End of Q-Table =======" << std::endl;
   }
-  ++(stats_->calls);
+  std::cout << "State: [ ";
+  for (double s : prev_state) {
+	  std::cout << std::fixed << std::setprecision(2) << s << " ";
+  }
+  std::cout << "]\n";
+  std::cout << "  Action: " << prev_best_cand->getName()
+	  << " => Q-Value: " << std::fixed << std::setprecision(4) << qtable_[prev_state][prev_best_cand]
+          << std::endl;
+ */
+ ++(stats_->calls);
   if(!init_) {
     init_ = true;
     initialize(rel);
@@ -422,6 +500,33 @@ Branches QLBrancher::findBranches(RelaxationPtr rel, NodePtr node,
   return branches;
 }
 
+
+/*void QLBrancher::printQTable() {
+        for (const auto& [state, actionMap] : qtable_) {
+                  std::cout << "State: [ ";
+                  for (double s : state) {
+                          std::cout << std::fixed << std::setprecision(2) << s << " ";
+                  }
+                  std::cout << "]\n";
+		  const auto& actions = actionMap.first;
+                  const auto& q_value = actionMap.second;
+		  for (const auto& act : actions) {
+                               // BrCandPtr vc = act;
+                                BrVarCandPtr vc = dynamic_cast<BrVarCand*>(act);
+                                double q = act.second;
+                                std::cout << "  Action: " << action                               //vc->getName()
+                                << " => Q-Value: " << q << "\n";
+                        }
+                  for (const auto& [action, q_value] : actionMap) {
+                          std::cout << "  Action: " << action->getName()                 //name
+                                  << " => Q-Value: " << std::fixed << std::setprecision(4) << q_value
+                                  << std::endl;
+                  }
+                  std::cout << "------------------------" << std::endl;
+          }
+          std::cout << "======= End of Q-Table =======" << std::endl;
+}
+*/
 
 
 

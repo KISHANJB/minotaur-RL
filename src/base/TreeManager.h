@@ -149,7 +149,7 @@ namespace Minotaur {
      * \return the updated lower bound.
      */
     double updateLb();
-    void removeAnc(NodePtr node);
+    void removeAnc(NodePtr node,int c_id);
     void keepRoot();
     void emptyNodeStore(){ clearAll(); }
     void keepNode(int c_id);

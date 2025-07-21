@@ -204,10 +204,11 @@ void TreeManager::keepNode(int c_id)
   }
   while (false==activeNodes_->isEmpty()) {
     n = activeNodes_->top();
-    if(n->getId() == c_id){
+    removeAnc(n,c_id);
+    if(getActiveNodes() == 2){
             break;
     }
-    removeNodeAndUp_(n);
+    //removeNodeAndUp_(n);
     activeNodes_->pop();
   }
 }
@@ -411,26 +412,25 @@ void TreeManager::removeNodeAndUp_(NodePtr node)
   }
 }
 
-void TreeManager::removeAnc(NodePtr node)
+void TreeManager::removeAnc(NodePtr node, int c_id)
 {
   NodePtr parent = node->getParent();
 
   // remove the given node
-  removeNode_(node);
+  if (node->getId() != c_id){
+	  removeNode_(node);
+  }
 
   // remove the ancestors of the given node, if they have no children left
   while (parent && parent->getNumChildren()==0) {
     node = parent;
     parent = node->getParent();
     removeNode_(node);
-    if (parent->getDepth() == 0){
+   /* if (parent->getDepth() == 0){
 	    break;
-    }
+    }*/
   }
 }
-
-
-
 
 /*
 void TreeManager::removeAnc(NodePtr node)
