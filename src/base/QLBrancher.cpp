@@ -186,9 +186,10 @@ BrCandPtr QLBrancher::findBestCandidate_(const double objval,
   EngineStatus status_up, status_down;
   BrCandPtr cand;
   std::vector<double> upperBounds;
+  // Static keyword ensures that the initialization happens only once i.e. when the function is called for the 1st time at the start of Branch & Bound.
+  static int gate = 0;
   static std::vector<double> prev_state={},root_state={};
   static std::vector<double> current_state={};
-  // why static here?
   static BrCandPtr best_cand = 0;
   //BrCandPtr cand, action, best_cand = 0;
   prev_state=current_state;
@@ -209,16 +210,22 @@ BrCandPtr QLBrancher::findBestCandidate_(const double objval,
    if (node->getDepth() == 0){
 	   root_state = current_state;
    }
-   if (node->getParent()->getDepth() == 0){
-	   prev_state = root_state;
-	   prev_best_cand = root_best_cand;
-   }
-
-
-   /*if (current_state == prev_state){
+  /* if (node->getParent()->getDepth() == 0){
 	   prev_state = root_state;
 	   prev_best_cand = root_best_cand;
    }*/
+
+
+  /* if (current_state == prev_state){
+	   prev_state = root_state;
+	   prev_best_cand = root_best_cand;
+   }*/
+
+   if (node->getId() == 1 && gate == 1){
+	   prev_state = root_state;
+           prev_best_cand = root_best_cand;
+	   gate = 0;
+   }
 
      /** -------------------------------------------------------------- RL Framework starts here------------------------------------------------------------------------------*/
 
@@ -313,6 +320,7 @@ BrCandPtr QLBrancher::findBestCandidate_(const double objval,
 	std::cout << "  Action: " << prev_best_cand->getName() 
 	          << " => Q-Value: " << std::fixed << std::setprecision(4) << qsa
 		  << std::endl;
+	gate = 1;
 	 return best_cand;
 
   } else {
