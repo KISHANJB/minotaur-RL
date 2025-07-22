@@ -512,17 +512,20 @@ void BranchAndBound::solve()
     }
      
     should_dive = false;
-   /* if(gate == 1){
-     current_node = processRoot2_(&should_prune, &dived_prev);
+    if(gate == 1){
+      rel = rel2;
+     // nodePrcssr_->process(current_node, rel, solPool_);
+        gate = 0;
      }
     else {
     rel =
         nodeRlxr_->createNodeRelaxation(current_node, dived_prev, should_prune);
-    nodePrcssr_->process(current_node, rel, solPool_);
-    }*/
+      rel2 = rel;
+   // nodePrcssr_->process(current_node, rel, solPool_);
+    }
 
-    rel =
-        nodeRlxr_->createNodeRelaxation(current_node, dived_prev, should_prune);
+    /*rel =
+        nodeRlxr_->createNodeRelaxation(current_node, dived_prev, should_prune);*/
     nodePrcssr_->process(current_node, rel, solPool_);
 
 
