@@ -17,7 +17,10 @@
 #include "BrCand.h"
 #include "BrVarCand.h"
 #include "Variable.h"
-
+#include "ActiveNodeStore.h"
+#include <vector>
+#include <iostream>
+#include <iterator>
 
 
 //#define MDBUG 1
@@ -506,7 +509,7 @@ void BranchAndBound::solve()
         << me_ << "depth = " << current_node->getDepth() << std::endl
         << me_ << "did we dive = " << dived_prev << std::endl;
 #endif
-     if (episode > 1000){
+     if (episode > 2){
             std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MAX EPISODE LIMIT REACHED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
             break;
     }
@@ -561,13 +564,8 @@ void BranchAndBound::solve()
       gate = 1;
       tm_->keepNode(c_id);
       std::cout << "No. of Remaining Nodes = " << tm_->getActiveNodes() << std::endl;
-    /*  ActiveNodeStorePtr copyStore = activeNodes->clone();
-      while (!copyStore->isEmpty()) {
-      NodePtr node = copyStore->top();
-      std::cout << "Node ID: " << node->getId() << std::endl;  // example
-      copyStore->pop();
-     } */
-     //std::cout << "All nodes have been removed" << std::endl;
+      std::cout << typeid(tm_->listActiveNodes()).name() << std::endl;
+         //std::cout << "All nodes have been removed" << std::endl;
       continue;
 
 

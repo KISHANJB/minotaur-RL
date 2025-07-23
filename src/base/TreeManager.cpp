@@ -150,49 +150,7 @@ void TreeManager::clearAll()
   }
 }
 
-/*
-void TreeManager::keepRoot()
-{ 
-  int rcount = 0;
-  NodePtr n;
-  NodePtrIterator node_i;
-  
-  if (aNode_) {
-    removeNodeAndUp_(aNode_);
-  }
-  while (true) {
-    n = activeNodes_->top();
-    if(n->getDepth()==0){
-      //rcount = rcount+1;
-      //continue;
-      break;
-    }
-    //delete n;
-    //removeAnc(n);
-    //removeNodeAndUp_(n);
-    activeNodes_->pop();
-  }
-}
 
-*/
-
-void TreeManager::keepRoot()
-{
-  NodePtr n;
-  NodePtrIterator node_i;
-
-  if (aNode_) {
-    removeNodeAndUp_(aNode_);
-  }
-  while (false==activeNodes_->isEmpty()) {
-    n = activeNodes_->top();
-    if(n->getDepth()== 0){
-	    break;
-    }
-    removeNodeAndUp_(n);
-    activeNodes_->pop();
-  }
-}
 
 void TreeManager::keepNode(int c_id)
 {
@@ -200,20 +158,21 @@ void TreeManager::keepNode(int c_id)
   NodePtrIterator node_i;
 
   if (aNode_) {
-    removeNodeAndUp_(aNode_);
+    removeAnc(aNode_,c_id);
   }
   while (false==activeNodes_->isEmpty()) {
     n = activeNodes_->top();
+   /* if(n->getId() == c_id){
+            break;
+    }*/
     removeAnc(n,c_id);
-    if(getActiveNodes() == 2){
+    if(n->getId() == c_id){
             break;
     }
-    //removeNodeAndUp_(n);
+
     activeNodes_->pop();
   }
 }
-
-
 
 
 UInt TreeManager::getActiveNodes() const
@@ -417,8 +376,13 @@ void TreeManager::removeAnc(NodePtr node, int c_id)
   NodePtr parent = node->getParent();
 
   // remove the given node
-  if (node->getId() != c_id){
+  if (node->getId() != c_id && node->getDepth() != 0){
 	  removeNode_(node);
+  }
+  else{
+	  std::cout<<"Saved From Deletion----" <<"Id =" <<node->getId()<<"  Depth = "<<node->getDepth()<<std::endl;
+	  std::cout<<"Father Saved From Deletion----" <<"Father Id =" <<node->getParent()->getId()<<"Father Depth = "<<node->getParent()->getDepth()<<std::endl;
+
   }
 
   // remove the ancestors of the given node, if they have no children left
@@ -426,9 +390,7 @@ void TreeManager::removeAnc(NodePtr node, int c_id)
     node = parent;
     parent = node->getParent();
     removeNode_(node);
-   /* if (parent->getDepth() == 0){
-	    break;
-    }*/
+	    
   }
 }
 
