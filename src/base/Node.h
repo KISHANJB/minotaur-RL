@@ -21,38 +21,38 @@ namespace Minotaur {
   class Node;
   class Relaxation;
   class WarmStart;
-  typedef const Node *ConstNodePtr;
-  typedef Relaxation *RelaxationPtr;
-  typedef WarmStart *WarmStartPtr;
-
-  /**
-   * A Node is a node in the search tree or the branch-and-bound tree.
-   * Associated with a node is a parent node from which the node is derived by
-   * adding branching constraints. Similarly a node may have one or more
-   * children each obtained by adding some branching constraints.
-   * Associated with each node is an array (or vector) of modifications that
-   * were applied to the parent in order to get the node. For instance, a
-   * modification could be change of one or more bounds on the variables.
-
-   * At each node, one can find a solution that is feasible to the original
-   * instance or show that the relaxation at the node is infeasible or obtain
-   * some other information. One can, at each node, solve a relaxation,
-   * tighten it, preprocess it, run heuristics.
-
-   * A node that has been evaluated and does not need any further processing
-   * and does not need to be branched upon is called a pruned node. A node
-   * that has not been processed yet is called an active node. A node that has
-   * been processed (is ready for branching or has been pruned) is called a
-   * fathomed node. A node whose all successors have been fathomed or deleted
-   * can be deleted. Since we store at each node, the modification that
-   * generated it from its parent, we can not delete nodes that have active
-   * successors.
-
-   * A Child of the current node can be obtained by applying a branch to the
-   * node. All immediate child nodes are saved in a vector.
-   */
-  class Node {
-
+  typedef const Node* ConstNodePtr;
+  typedef Relaxation* RelaxationPtr;
+  typedef WarmStart* WarmStartPtr;
+  
+   /**
+    * A Node is a node in the search tree or the branch-and-bound tree.
+    * Associated with a node is a parent node from which the node is derived by
+    * adding branching constraints. Similarly a node may have one or more
+    * children each obtained by adding some branching constraints.
+    * Associated with each node is an array (or vector) of modifications that
+    * were applied to the parent in order to get the node. For instance, a
+    * modification could be change of one or more bounds on the variables.
+  
+    * At each node, one can find a solution that is feasible to the original
+    * instance or show that the relaxation at the node is infeasible or obtain
+    * some other information. One can, at each node, solve a relaxation,
+    * tighten it, preprocess it, run heuristics. 
+  
+    * A node that has been evaluated and does not need any further processing
+    * and does not need to be branched upon is called a pruned node. A node
+    * that has not been processed yet is called an active node. A node that has
+    * been processed (is ready for branching or has been pruned) is called a 
+    * fathomed node. A node whose all successors have been fathomed or deleted
+    * can be deleted. Since we store at each node, the modification that
+    * generated it from its parent, we can not delete nodes that have active
+    * successors.
+  
+    * A Child of the current node can be obtained by applying a branch to the 
+    * node. All immediate child nodes are saved in a vector.
+    */
+  class Node {    
+	  friend class BranchAndBound;
   public:
     /// Default constructor.
     Node();
@@ -65,9 +65,13 @@ namespace Minotaur {
 
     /// Default destructor.
     virtual ~Node();
+    
+    NodePtr clone() const;
 
     /// Add a child node.
     void addChild(NodePtr childNode);
+    
+    //Node copyNode(NodePtr node){ return Node(NodePtr node); }
 
     /// Add cut to the cut-pool of this node
     void addCutToPool(CutPtr cut, RelaxationPtr rel);
@@ -96,13 +100,13 @@ namespace Minotaur {
     void applyCutsByIndex(RelaxationPtr rel);
 
     /**
-     * Apply the modifications including the branching that were made
+     * Apply the modifications including the branching that were made 
      * at this node to the problem.
      */
     void applyPMods(ProblemPtr p);
 
     /**
-     * Apply the modifications including the branching that were made
+     * Apply the modifications including the branching that were made 
      * at this node to the problem.
      */
     void applyRMods(RelaxationPtr rel);
@@ -141,13 +145,13 @@ namespace Minotaur {
     UInt getId() const { return id_; }
 
     /// Return the vector of last strong branching information of candidates.
-    UIntVector getLastStrongBranched() { return lastStrBranched_; }
+    UIntVector getLastStrongBranched() {return lastStrBranched_;}
 
     /// Return the lower bound of the relaxation obtained at this node.
     double getLb() const { return lb_; }
 
     /// Number of children of this node.
-    size_t getNumChildren() { return children_.size(); }
+    UInt getNumChildren() { return children_.size(); }
 
     /// Return a pointer to the parent node.
     NodePtr getParent() const { return parent_; }
@@ -176,9 +180,9 @@ namespace Minotaur {
 
     /// Get the tie-breaking score.
     double getTbScore() const { return tbScore_; }
-
+    
     double setVioVal(double v) { return vioVal_ = v; }
-
+    
     double getVioVal() { return vioVal_; }
 
     /**
@@ -197,7 +201,7 @@ namespace Minotaur {
     WarmStartPtr getWarmStart() { return ws_; }
 
     /// \todo Dont know what this is meant for.
-    void makeChildOf(const Node *parent);
+    void makeChildOf(const Node* parent);
 
     /**
      * Get the first modification that was applied at this node to the
@@ -245,10 +249,7 @@ namespace Minotaur {
     void setId(UInt id);
 
     /// Set the vector of last strong branched information of candidates.
-    void setLastStrongBranched(UIntVector lstStrnBrnchd)
-    {
-      lastStrBranched_ = lstStrnBrnchd;
-    }
+    void setLastStrongBranched(UIntVector lstStrnBrnchd) {lastStrBranched_ = lstStrnBrnchd;}
 
     /// Set a lower bound for the relaxation at this node.
     void setLb(double value);
@@ -272,10 +273,10 @@ namespace Minotaur {
     void setTimesUp(UIntVector timesUp) { timesUp_ = timesUp; }
 
     /// Set warm start information
-    void setWarmStart(WarmStartPtr ws);
+    void setWarmStart (WarmStartPtr ws);
 
     /**
-     * Undo the modifications including the branching that were made
+     * Undo the modifications including the branching that were made 
      * at this node to the problem.
      */
     void undoPMods(ProblemPtr p);
@@ -332,12 +333,12 @@ namespace Minotaur {
     ///Write the node
     void write(std::ostream &o) const;
 
-  private:
+  private:   
     /**
      * The branching constraints that were used to create this node from its
      * parent.
      */
-    BranchPtr branch_;
+    BranchPtr branch_; 
 
     /// Vector of immediate child nodes.
     NodePtrVector children_;
@@ -385,7 +386,7 @@ namespace Minotaur {
     DoubleVector pseudoUp_;
 
     /// The status of this node.
-    NodeStatus status_;
+    NodeStatus status_;   
 
     /// Violation measure at the node.
     double vioVal_;
@@ -403,8 +404,8 @@ namespace Minotaur {
     UIntVector timesDown_;
 
     /**
-     * \brief Number of times we have branched up and noted the effect on
-     * objective improvement.
+     * \brief Number of times we have branched up and noted the effect on objective
+     * improvement.
      */
     UIntVector timesUp_;
 
@@ -412,12 +413,13 @@ namespace Minotaur {
     WarmStartPtr ws_;
 
     /// Not allowed to copy a node.
-    Node(const Node &node);
+    Node(const Node &node); 
 
     /// Not allowed to copy a node.
-    Node(NodePtr node);
+    Node(NodePtr node); 
   };
 
 
-}  //namespace Minotaur
+}
 #endif
+

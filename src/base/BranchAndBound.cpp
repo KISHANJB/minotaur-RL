@@ -21,6 +21,7 @@
 #include <vector>
 #include <iostream>
 #include <iterator>
+#include <Node.h>
 
 
 //#define MDBUG 1
@@ -30,7 +31,6 @@ using namespace Minotaur;
 
 const std::string BranchAndBound::me_ = "BranchAndBound: ";
 ActiveNodeStorePtr activeNodes;
-
 
 
 BranchAndBound::BranchAndBound()
@@ -422,6 +422,8 @@ void BranchAndBound::solve()
 { 
   bool should_dive = false, dived_prev = false;
   bool should_prune = false;
+  Node root_node;
+  Node after_root;
   NodePtr current_node = NodePtr();
   NodePtr current_node2 = NodePtr();
   NodePtr new_node = NodePtr();
@@ -468,6 +470,7 @@ void BranchAndBound::solve()
   // do the root
   std::cout << " Process Root Visited " << std::endl;
   current_node = processRoot_(&should_prune, &dived_prev);
+  NodePtr after_root = current_node->clone();
   c_id = current_node->getId();
   current_node2 = current_node;
   //current_node2 = current_node->getParent();
@@ -509,11 +512,18 @@ void BranchAndBound::solve()
         << me_ << "depth = " << current_node->getDepth() << std::endl
         << me_ << "did we dive = " << dived_prev << std::endl;
 #endif
-     if (episode > 2){
+
+
+    /*if(shouldStop_()) {
+      tm_->updateLb();
+      break;
+     }*/
+
+     if (episode > 100 ){
             std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MAX EPISODE LIMIT REACHED !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
             break;
     }
-     
+    
     should_dive = false;
     if(gate == 1){
       rel = rel2;
@@ -564,7 +574,7 @@ void BranchAndBound::solve()
       gate = 1;
       tm_->keepNode(c_id);
       std::cout << "No. of Remaining Nodes = " << tm_->getActiveNodes() << std::endl;
-      std::cout << typeid(tm_->listActiveNodes()).name() << std::endl;
+      //std::cout << typeid(tm_->listActiveNodes()).name() << std::endl;
          //std::cout << "All nodes have been removed" << std::endl;
       continue;
 

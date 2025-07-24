@@ -83,6 +83,24 @@ Node::~Node()
   children_.clear();
 }
 
+NodePtr Node::clone() const {
+    Node* newNode = new Node();
+    newNode->branch_ = this->branch_;  // assuming shared_ptr or deep copy
+    newNode->depth_ = this->depth_;
+    newNode->id_ = this->id_;
+    newNode->lb_ = this->lb_;
+    newNode->pMods_ = this->pMods_;  // pointer? consider deep copy
+    newNode->rMods_ = this->rMods_;
+    newNode->parent_ = this->parent_; // or nullptr if you don't want parent
+    newNode->status_ = this->status_;
+    newNode->vioVal_ = this->vioVal_;
+    newNode->tbScore_ = this->tbScore_;
+    newNode->cutPool_ = this->cutPool_;
+    newNode->ws_ = this->ws_;
+    return newNode;
+}
+
+
 
 void Node::addChild(NodePtr childNode)
 {
