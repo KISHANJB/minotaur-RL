@@ -422,8 +422,8 @@ void BranchAndBound::solve()
 { 
   bool should_dive = false, dived_prev = false;
   bool should_prune = false;
-  Node root_node;
-  Node after_root;
+ // Node root_node;
+ // Node after_root;
   NodePtr current_node = NodePtr();
   NodePtr current_node2 = NodePtr();
   NodePtr new_node = NodePtr();
@@ -471,9 +471,10 @@ void BranchAndBound::solve()
   std::cout << " Process Root Visited " << std::endl;
   current_node = processRoot_(&should_prune, &dived_prev);
   NodePtr after_root = current_node->clone();
+  NodePtr root_node = current_node->getParent()->clone();
   c_id = current_node->getId();
-  current_node2 = current_node;
-  //current_node2 = current_node->getParent();
+  //current_node2 = current_node;
+  //current_node2 = &after_root;
 
   // stop if done
   if(!current_node) {
@@ -567,12 +568,13 @@ void BranchAndBound::solve()
       }
       new_node = tm_->getCandidate();
       dived_prev = false;
-      //current_node = &root_node;
-      current_node = current_node2;
+      current_node = after_root;
+      //current_node = current_node2;
       std::cout << " =============================================== EPISODE No. " << episode << " ENDS HERE================================ "   << std::endl;
       episode = episode + 1;
       gate = 1;
-      tm_->keepNode(c_id);
+      tm_->emptyNodeStore();
+      //tm_->keepNode(c_id);
       std::cout << "No. of Remaining Nodes = " << tm_->getActiveNodes() << std::endl;
       //std::cout << typeid(tm_->listActiveNodes()).name() << std::endl;
          //std::cout << "All nodes have been removed" << std::endl;

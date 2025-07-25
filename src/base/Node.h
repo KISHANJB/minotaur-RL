@@ -65,7 +65,7 @@ namespace Minotaur {
 
     /// Default destructor.
     virtual ~Node();
-    
+   // To copy a node 
     NodePtr clone() const;
 
     /// Add a child node.
