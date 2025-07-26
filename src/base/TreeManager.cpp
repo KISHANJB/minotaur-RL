@@ -157,13 +157,14 @@ void TreeManager::keepNode(int c_id)
   NodePtr n;
   NodePtrIterator node_i;
 
-  if (aNode_ and aNode_->getId() != c_id ) {
+  if (aNode_ and aNode_->getId() != c_id and aNode_->getDepth() != 0) {
+    aNode_->removeWarmStart();
     removeAnc(aNode_,c_id);
   }
   while (false==activeNodes_->isEmpty()) {
     n = activeNodes_->top();
     removeAnc(n,c_id);
-     activeNodes_->pop();
+    activeNodes_->pop();
   }
 }
 
@@ -370,19 +371,21 @@ void TreeManager::removeAnc(NodePtr node, int c_id)
 
   // remove the given node
   if (node->getId() != c_id && node->getDepth() != 0){
+	  node->removeWarmStart();
 	  removeNode_(node);
   }
-  else{
+  /*else{
 	  std::cout<<"Saved From Deletion----" <<"Id =" <<node->getId()<<"  Depth = "<<node->getDepth()<<std::endl;
 	  std::cout<<"Father Saved From Deletion----" <<"Father Id =" <<node->getParent()->getId()<<"Father Depth = "<<node->getParent()->getDepth()<<std::endl;
 
-  }
+  }*/
 
   // remove the ancestors of the given node, if they have no children left
   while (parent && parent->getNumChildren()==0) {
     node = parent;
     parent = node->getParent();
     if (node->getId() != c_id && node->getDepth() != 0){
+	  node->removeWarmStart();
           removeNode_(node);
     }
 

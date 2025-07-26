@@ -211,79 +211,6 @@ NodePtr BranchAndBound::processRoot_(bool* should_prune, bool* should_dive)
   *should_prune = prune;
   return current_node;
 }
-
-
-NodePtr BranchAndBound::processRoot2_(bool* should_prune, bool* should_dive)
-{
-  //NodePtr current_node = (NodePtr) new Node();
-  NodePtr current_node = new Node(); 
-  NodePtr new_node = NodePtr(); // NULL
-  RelaxationPtr rel;
-  bool prune = *should_prune;
-  Branches branches = 0;
-  WarmStartPtr ws;
-
-/*#if SPEW
-  logger_->msgStream(LogDebug) << me_ << "creating root node" << std::endl;
-#endif
-*/
-  showStatusHead_();
-//  tm_->insertRoot(current_node);
-
-  if(options_->createRoot == true) {
-    rel = nodeRlxr_->createRootRelaxation(current_node, solPool_, prune);
-    rel->setProblem(problem_);
-  } else {
-    rel = nodeRlxr_->getRelaxation();
-  }
-  // We may find a solution while creating a relaxation. Setting upper bound here.
-  tm_->setUb(solPool_->getBestSolutionValue());
-
-  if(!prune) {
-    // solve the root node only if the initial root relaxation is not pruned
-    // because of the unboundedness or infeasibility or something else
-#if SPEW
-    logger_->msgStream(LogDebug) << me_ << "processing root node" << std::endl;
-#endif
-
-    nodePrcssr_->processRootNode(current_node, rel, solPool_);
-    ++stats_->nodesProc;
-    if(nodePrcssr_->foundNewSolution()) {
-      tm_->setUb(solPool_->getBestSolutionValue());
-    }
-
-    prune = shouldPrune_(current_node);
-  }
-  if(prune) {
-    nodeRlxr_->reset(current_node, false);
-    tm_->pruneNode(current_node);
-    tm_->removeActiveNode(current_node);
-  } else {
-#if SPEW
-    logger_->msgStream(LogDebug) << me_ << "branching in root" << std::endl;
-#endif
-    // branch.
-    branches = nodePrcssr_->getBranches();
-    ws = nodePrcssr_->getWarmStart();
-    tm_->removeActiveNode(current_node);
-    *should_dive = tm_->shouldDive();
-    new_node = tm_->branch(branches, current_node, ws);
-    assert((*should_dive && new_node) || (!(*should_dive) && !new_node));
-    if(!(*should_dive)) {
-      nodeRlxr_->reset(current_node, false);
-      new_node = tm_->getCandidate();
-      assert(new_node);
-    }
-  }
-  current_node = new_node;
-
-  tm_->updateLb();
-
-  showStatus_(*should_dive, false);
-  *should_prune = prune;
-  return current_node;
-}
-
 void BranchAndBound::setLogLevel(LogLevel level)
 {
   logger_->setMaxLevel(level);
@@ -470,6 +397,19 @@ void BranchAndBound::solve()
   // do the root
   std::cout << " Process Root Visited " << std::endl;
   current_node = processRoot_(&should_prune, &dived_prev);
+      std::cout <<"First Current Node's branch = "<< current_node->branch_ << std::endl;
+      std::cout << "First Current Node's depth = " << current_node->depth_ << std::endl;
+      std::cout << "First Current Node's Id = "<< current_node->id_  << std::endl;
+      std::cout << "First Current Node's lb = "<< current_node->lb_  << std::endl;
+      //std::cout << "First Current Node's pmods = "<<  current_node->pMods_ << std::endl;
+      //std::cout << "First Current Node's rmods  = "<< current_node->rMods_  << std::endl;
+      std::cout << "First Current Node's parent = "<< current_node->parent_ << std::endl;
+      std::cout << "First Current Node's status = "<< current_node->status_  << std::endl;
+      std::cout << "First Current Node's vioVal = "<< current_node->vioVal_  << std::endl;
+      std::cout << "First Current Node's tbScore = "<< current_node->tbScore_  << std::endl;
+      //std::cout << "First Current Node's CutPool = "<<  current_node->cutPool_ << std::endl;
+      std::cout << "First Current Node's ws = "<<  current_node->ws_ << std::endl;
+
   NodePtr after_root = current_node->clone();
   NodePtr root_node = current_node->getParent()->clone();
   c_id = current_node->getId();
@@ -569,12 +509,40 @@ void BranchAndBound::solve()
       new_node = tm_->getCandidate();
       dived_prev = false;
       current_node = after_root;
+     /* std::cout <<"First Current Node's branch = "<< current_node->branch_ << std::endl;
+      std::cout << "First Current Node's depth = " << current_node->depth_ << std::endl;
+      std::cout << "First Current Node's Id = "<< current_node->id_  << std::endl;
+      std::cout << "First Current Node's lb = "<< current_node->lb_  << std::endl;
+      //std::cout << "First Current Node's pmods = "<<  current_node->pMods_ << std::endl;
+      //std::cout << "First Current Node's rmods  = "<< current_node->rMods_  << std::endl;
+      std::cout << "First Current Node's parent = "<< current_node->parent_ << std::endl;
+      std::cout << "First Current Node's status = "<< current_node->status_  << std::endl;
+      std::cout << "First Current Node's vioVal = "<< current_node->vioVal_  << std::endl;
+      std::cout << "First Current Node's tbScore = "<< current_node->tbScore_  << std::endl;
+      //std::cout << "First Current Node's CutPool = "<<  current_node->cutPool_ << std::endl;
+      std::cout << "First Current Node's ws = "<<  current_node->ws_ << std::endl;
+      */
       //current_node = current_node2;
       std::cout << " =============================================== EPISODE No. " << episode << " ENDS HERE================================ "   << std::endl;
       episode = episode + 1;
       gate = 1;
-      tm_->emptyNodeStore();
-      //tm_->keepNode(c_id);
+       tm_->keepNode(c_id);
+      //tm_->emptyNodeStore();
+      std::cout <<"First Current Node's branch = "<< current_node->branch_ << std::endl;
+      std::cout << "First Current Node's depth = " << current_node->depth_ << std::endl;
+      std::cout << "First Current Node's Id = "<< current_node->id_  << std::endl;
+      std::cout << "First Current Node's lb = "<< current_node->lb_  << std::endl;
+      //std::cout << "First Current Node's pmods = "<<  current_node->pMods_ << std::endl;
+      //std::cout << "First Current Node's rmods  = "<< current_node->rMods_  << std::endl;
+      std::cout << "First Current Node's parent = "<< current_node->parent_ << std::endl;
+      std::cout << "First Current Node's status = "<< current_node->status_  << std::endl;
+      std::cout << "First Current Node's vioVal = "<< current_node->vioVal_  << std::endl;
+      std::cout << "First Current Node's tbScore = "<< current_node->tbScore_  << std::endl;
+      //std::cout << "First Current Node's CutPool = "<<  current_node->cutPool_ << std::endl;
+      current_node->ws_->setCntZero();
+      std::cout << "First Current Node's ws = "<< current_node->ws_ << std::endl;
+      tm_->keepNode(c_id);
+      std::cout << "Stored Relaxation = " << rel2 << std::endl;
       std::cout << "No. of Remaining Nodes = " << tm_->getActiveNodes() << std::endl;
       //std::cout << typeid(tm_->listActiveNodes()).name() << std::endl;
          //std::cout << "All nodes have been removed" << std::endl;

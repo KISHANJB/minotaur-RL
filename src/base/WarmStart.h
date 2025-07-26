@@ -59,7 +59,7 @@ namespace Minotaur {
       /// Return true if warm start information is initialized, false
       /// otherwise.
       virtual bool hasInfo() = 0;
-
+      void setCntZero(){ cnt_ = 0;};
       virtual void incrUseCnt()
       {++cnt_;} ;
       
