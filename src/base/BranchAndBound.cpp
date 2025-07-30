@@ -410,10 +410,10 @@ void BranchAndBound::solve()
       //std::cout << "First Current Node's CutPool = "<<  current_node->cutPool_ << std::endl;
       std::cout << "First Current Node's ws = "<<  current_node->ws_ << std::endl;
 
-  NodePtr after_root = current_node->clone();
-  NodePtr root_node = current_node->getParent()->clone();
+  //NodePtr after_root = current_node->clone();
+  //NodePtr root_node = current_node->getParent()->clone();
   c_id = current_node->getId();
-  //current_node2 = current_node;
+  current_node2 = current_node;
   //current_node2 = &after_root;
 
   // stop if done
@@ -508,7 +508,8 @@ void BranchAndBound::solve()
       }
       new_node = tm_->getCandidate();
       dived_prev = false;
-      current_node = after_root;
+      //current_node = after_root;
+     // after_root->ws_=0;
      /* std::cout <<"First Current Node's branch = "<< current_node->branch_ << std::endl;
       std::cout << "First Current Node's depth = " << current_node->depth_ << std::endl;
       std::cout << "First Current Node's Id = "<< current_node->id_  << std::endl;
@@ -522,11 +523,12 @@ void BranchAndBound::solve()
       //std::cout << "First Current Node's CutPool = "<<  current_node->cutPool_ << std::endl;
       std::cout << "First Current Node's ws = "<<  current_node->ws_ << std::endl;
       */
-      //current_node = current_node2;
+      current_node = current_node2;
+      current_node->ws_=0;
       std::cout << " =============================================== EPISODE No. " << episode << " ENDS HERE================================ "   << std::endl;
       episode = episode + 1;
       gate = 1;
-       tm_->keepNode(c_id);
+       //tm_->keepNode(c_id);
       //tm_->emptyNodeStore();
       std::cout <<"First Current Node's branch = "<< current_node->branch_ << std::endl;
       std::cout << "First Current Node's depth = " << current_node->depth_ << std::endl;
@@ -539,8 +541,10 @@ void BranchAndBound::solve()
       std::cout << "First Current Node's vioVal = "<< current_node->vioVal_  << std::endl;
       std::cout << "First Current Node's tbScore = "<< current_node->tbScore_  << std::endl;
       //std::cout << "First Current Node's CutPool = "<<  current_node->cutPool_ << std::endl;
-      current_node->ws_->setCntZero();
-      std::cout << "First Current Node's ws = "<< current_node->ws_ << std::endl;
+      //current_node->ws_->setCntZero();
+      //ws->setCntZero();
+      //delete current_node->ws_;
+      //std::cout << "First Current Node's ws = "<< current_node->ws_ << std::endl;
       tm_->keepNode(c_id);
       std::cout << "Stored Relaxation = " << rel2 << std::endl;
       std::cout << "No. of Remaining Nodes = " << tm_->getActiveNodes() << std::endl;
@@ -554,8 +558,9 @@ void BranchAndBound::solve()
       logger_->msgStream(LogDebug) << me_ << "branching" << std::endl;
 #endif
       branches = nodePrcssr_->getBranches();
-
-      ws = nodePrcssr_->getWarmStart();
+     // if (episode < 2){ 
+	 ws = nodePrcssr_->getWarmStart();
+     // }
       if(!dived_prev) {
         tm_->removeActiveNode(current_node);
       }
