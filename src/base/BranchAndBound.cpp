@@ -349,8 +349,6 @@ void BranchAndBound::solve()
 { 
   bool should_dive = false, dived_prev = false;
   bool should_prune = false;
- // Node root_node;
- // Node after_root;
   NodePtr current_node = NodePtr();
   NodePtr current_node2 = NodePtr();
   NodePtr new_node = NodePtr();
@@ -397,26 +395,7 @@ void BranchAndBound::solve()
   // do the root
   std::cout << " Process Root Visited " << std::endl;
   current_node = processRoot_(&should_prune, &dived_prev);
-      std::cout <<"First Current Node's branch = "<< current_node->branch_ << std::endl;
-      std::cout << "First Current Node's depth = " << current_node->depth_ << std::endl;
-      std::cout << "First Current Node's Id = "<< current_node->id_  << std::endl;
-      std::cout << "First Current Node's lb = "<< current_node->lb_  << std::endl;
-      //std::cout << "First Current Node's pmods = "<<  current_node->pMods_ << std::endl;
-      //std::cout << "First Current Node's rmods  = "<< current_node->rMods_  << std::endl;
-      std::cout << "First Current Node's parent = "<< current_node->parent_ << std::endl;
-      std::cout << "First Current Node's status = "<< current_node->status_  << std::endl;
-      std::cout << "First Current Node's vioVal = "<< current_node->vioVal_  << std::endl;
-      std::cout << "First Current Node's tbScore = "<< current_node->tbScore_  << std::endl;
-      //std::cout << "First Current Node's CutPool = "<<  current_node->cutPool_ << std::endl;
-      std::cout << "First Current Node's ws = "<<  current_node->ws_ << std::endl;
-
-  //NodePtr after_root = current_node->clone();
-  //NodePtr root_node = current_node->getParent()->clone();
-  c_id = current_node->getId();
-  current_node2 = current_node;
-  //current_node2 = &after_root;
-
-  // stop if done
+ // stop if done
   if(!current_node) {
     tm_->updateLb();
     if(tm_->getUb() <= -INFINITY) {
@@ -467,19 +446,40 @@ void BranchAndBound::solve()
     
     should_dive = false;
     if(gate == 1){
-      rel = rel2;
-     // nodePrcssr_->process(current_node, rel, solPool_);
+    should_dive = false, dived_prev = false;
+      // initialize statistics
+  if(stats_) {
+    delete stats_;
+  }
+  stats_ = new BabStats();
+
+  // initialize solution pool
+  // TODO: use user options to set the pool size. For now it is 1.
+  solPool_ = (SolutionPoolPtr) new SolutionPool(env_, problem_, 1); 
+
+  // call heuristics before the root, if needed
+  for(HeurVector::iterator it = preHeurs_.begin(); it != preHeurs_.end();
+      ++it) {
+    (*it)->solve(current_node, rel, solPool_);
+    if(solPool_->getBestSolutionValue() < INFINITY) {
+      break;
+    }
+  }
+  tm_->setUb(solPool_->getBestSolutionValue());
+
+  // do the root
+  std::cout << " Process Root Visited " << std::endl;
+  current_node = processRoot_(&should_prune, &dived_prev);
         gate = 0;
      }
-    else {
+  /*  else {
     rel =
         nodeRlxr_->createNodeRelaxation(current_node, dived_prev, should_prune);
-      rel2 = rel;
+     // rel2 = rel;
    // nodePrcssr_->process(current_node, rel, solPool_);
-    }
+    }*/
 
-    /*rel =
-        nodeRlxr_->createNodeRelaxation(current_node, dived_prev, should_prune);*/
+    rel = nodeRlxr_->createNodeRelaxation(current_node, dived_prev, should_prune);
     nodePrcssr_->process(current_node, rel, solPool_);
 
 
@@ -508,48 +508,15 @@ void BranchAndBound::solve()
       }
       new_node = tm_->getCandidate();
       dived_prev = false;
-      //current_node = after_root;
-     // after_root->ws_=0;
-     /* std::cout <<"First Current Node's branch = "<< current_node->branch_ << std::endl;
-      std::cout << "First Current Node's depth = " << current_node->depth_ << std::endl;
-      std::cout << "First Current Node's Id = "<< current_node->id_  << std::endl;
-      std::cout << "First Current Node's lb = "<< current_node->lb_  << std::endl;
-      //std::cout << "First Current Node's pmods = "<<  current_node->pMods_ << std::endl;
-      //std::cout << "First Current Node's rmods  = "<< current_node->rMods_  << std::endl;
-      std::cout << "First Current Node's parent = "<< current_node->parent_ << std::endl;
-      std::cout << "First Current Node's status = "<< current_node->status_  << std::endl;
-      std::cout << "First Current Node's vioVal = "<< current_node->vioVal_  << std::endl;
-      std::cout << "First Current Node's tbScore = "<< current_node->tbScore_  << std::endl;
-      //std::cout << "First Current Node's CutPool = "<<  current_node->cutPool_ << std::endl;
-      std::cout << "First Current Node's ws = "<<  current_node->ws_ << std::endl;
-      */
-      current_node = current_node2;
-      current_node->ws_=0;
       std::cout << " =============================================== EPISODE No. " << episode << " ENDS HERE================================ "   << std::endl;
       episode = episode + 1;
       gate = 1;
-       //tm_->keepNode(c_id);
-      //tm_->emptyNodeStore();
-      std::cout <<"First Current Node's branch = "<< current_node->branch_ << std::endl;
-      std::cout << "First Current Node's depth = " << current_node->depth_ << std::endl;
-      std::cout << "First Current Node's Id = "<< current_node->id_  << std::endl;
-      std::cout << "First Current Node's lb = "<< current_node->lb_  << std::endl;
-      //std::cout << "First Current Node's pmods = "<<  current_node->pMods_ << std::endl;
-      //std::cout << "First Current Node's rmods  = "<< current_node->rMods_  << std::endl;
-      std::cout << "First Current Node's parent = "<< current_node->parent_ << std::endl;
-      std::cout << "First Current Node's status = "<< current_node->status_  << std::endl;
-      std::cout << "First Current Node's vioVal = "<< current_node->vioVal_  << std::endl;
-      std::cout << "First Current Node's tbScore = "<< current_node->tbScore_  << std::endl;
-      //std::cout << "First Current Node's CutPool = "<<  current_node->cutPool_ << std::endl;
-      //current_node->ws_->setCntZero();
-      //ws->setCntZero();
-      //delete current_node->ws_;
-      //std::cout << "First Current Node's ws = "<< current_node->ws_ << std::endl;
-      tm_->keepNode(c_id);
-      std::cout << "Stored Relaxation = " << rel2 << std::endl;
-      std::cout << "No. of Remaining Nodes = " << tm_->getActiveNodes() << std::endl;
-      //std::cout << typeid(tm_->listActiveNodes()).name() << std::endl;
-         //std::cout << "All nodes have been removed" << std::endl;
+      current_node = nullptr;
+      solPool_->~SolutionPool();
+      tm_->emptyNodeStore();
+      //tm_->~TreeManager();
+      tm_->zeroSize();
+      std::cout << "All nodes have been removed" << std::endl;
       continue;
 
 
